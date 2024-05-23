@@ -1,5 +1,7 @@
-#include <iostream>
 #include <deque>
+#include <iostream>
+#include <string>
+#include <unordered_map>
 #include "include/raylib.h"
 #include "include/raymath.h"
 
@@ -71,7 +73,6 @@ public:
 };
 
 class Food {
-
 public:
 	Vector2 position;
 	Texture2D texture;
@@ -100,8 +101,6 @@ public:
 	void Draw() {
 		DrawRectangle(offset + position.x * cellSize, offset + position.y * cellSize, cellSize, cellSize, white);
 	}
-
-
 };
 
 class Game {
@@ -158,6 +157,81 @@ public:
 		}
 	}
 };
+
+enum Actions { UP, DOWN, LEFT, RIGHT };
+const int numActions = 4;
+
+// A function to get the state representation
+std::string GetState(const Snake &snake, const Food &food) {
+	Vector2 head = snake.body[0];
+	Vector2 foodPos = food.position;
+	Vector2 direction = snake.direction;
+
+	bool obstacleUp = false, obstacleDown = false, obstacleLeft = false, obstacleRight = false;
+
+	// Check for obstacles in each direction.
+	// ElementInDeque iterates over all elements in the deque and it it finds
+	// the input element in the deque it returns true.
+	// In this case iterate over elements in the snake body and see if the snake
+	// is pointing towards its own body (ElementInDeque) or (||) it is pointing
+	// to outside the game boundary.
+	if (ElementInDeque(Vector2{head.x, head.y - 1}, snake.body) || head.y - 1 < 0) obstacleUp = true;
+	if (ElementInDeque(Vector2{head.x, head.y + 1}, snake.body) || head.y + 1 >= cellCount) obstacleDown = false;
+	if (ElementInDeque(Vector2{head.x - 1, head.y}, snake.body) || head.x - 1 < 0) obstacleLeft = true;
+	if (ElementInDeque(Vector2{head.x + 1, head.y}, snake.body) || head.x + 1 >= cellCount) obstacleRight = true;
+
+	std::string state = std::to_string((int)head.x) + "_" + std::to_string((int)head.y) + "_" +
+						std::to_string((int)foodPos.x) + "_" + std::to_string((int)foodPos.y) + "_" +
+						std::to_string((int)direction.x) + "_" + std::to_string((int)direction.y) + "_" +
+						std::to_string(obstacleUp) + "_" + std::to_string(obstacleDown) + "_" +
+						std::to_string(obstacleLeft) + "_" + std::to_string(obstacleRight);
+
+	return state;
+}
+
+std::unordered_map<std::string, std::vector<double>> QTable;
+
+// Initialise Q-Values to zero for all state-action pairs.
+// First pair of for loops is for x, y, the position of the head.
+// Second pair of for loops is for fx, fy, the position of the food.
+// Third pair of for loops is for dx, dy, the values for the direction.
+// Final for loops, ou, od, ol, or are the values of obstacle presence.
+// The Q-values will change during training. When the agent encounters
+// one of the states in the table, based off the feedback it will update
+// the Q-value for the particular action, and so the more positive the 
+// Q-value, the stronger suggestion to take that action.
+void InitialiseQTable() {
+	for (int x = 0; x < cellCount; x++) {
+		for (int y = 0; y < cellCount; y++) {
+			for (int fx = 0; fx < cellCount; fx++) {
+				for (int fy = 0; fy < cellCount; fy++) {
+					for (int dx = 0; dx < cellCount; dx++) {
+						for (int dy = 0; dy < cellCount; dy++) {
+							for (int ou = 0; ou <= 1; ou++) {
+								for (int od = 0; od <= 1; od++) {
+									for (int ol = 0; ol <= 1; ol++) {
+										for (int or = 0; or <= 1; or++) {
+											std::string state = std::to_string(x) + "_" + std::to_string(y) + "_" +
+																std::to_string(fx) + "_" + std::to_string(fy) + "_" +
+																std::to_string(dx) + "_" + std::to_string(dy) + "_" +
+																std::to_string(ou) + "_" + std::to_string(od) + "_" +
+																std::to_string(ol) + "_" + std::to_string(or) + "_";
+											
+											QTable[state] = std::vector<double> (numActions, 0.0);
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+// Q Learning Algorithm
+
 
 int main() {
 	// Initialise game, create game window and set FPS.
