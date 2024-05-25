@@ -1,6 +1,9 @@
+#include <algorithm>
 #include <deque>
+#include <fstream>
 #include <iostream>
 #include <string>
+#include <sstream>
 #include <unordered_map>
 #include "include/raylib.h"
 #include "include/raymath.h"
@@ -191,43 +194,12 @@ std::string GetState(const Snake &snake, const Food &food) {
 
 std::unordered_map<std::string, std::vector<double>> QTable;
 
-// Initialise Q-Values to zero for all state-action pairs.
-// First pair of for loops is for x, y, the position of the head.
-// Second pair of for loops is for fx, fy, the position of the food.
-// Third pair of for loops is for dx, dy, the values for the direction.
-// Final for loops, ou, od, ol, or are the values of obstacle presence.
-// The Q-values will change during training. When the agent encounters
-// one of the states in the table, based off the feedback it will update
-// the Q-value for the particular action, and so the more positive the 
-// Q-value, the stronger suggestion to take that action.
-void InitialiseQTable() {
-	for (int x = 0; x < cellCount; x++) {
-		for (int y = 0; y < cellCount; y++) {
-			for (int fx = 0; fx < cellCount; fx++) {
-				for (int fy = 0; fy < cellCount; fy++) {
-					for (int dx = 0; dx < cellCount; dx++) {
-						for (int dy = 0; dy < cellCount; dy++) {
-							for (int ou = 0; ou <= 1; ou++) {
-								for (int od = 0; od <= 1; od++) {
-									for (int ol = 0; ol <= 1; ol++) {
-										for (int or = 0; or <= 1; or++) {
-											std::string state = std::to_string(x) + "_" + std::to_string(y) + "_" +
-																std::to_string(fx) + "_" + std::to_string(fy) + "_" +
-																std::to_string(dx) + "_" + std::to_string(dy) + "_" +
-																std::to_string(ou) + "_" + std::to_string(od) + "_" +
-																std::to_string(ol) + "_" + std::to_string(or) + "_";
-											
-											QTable[state] = std::vector<double> (numActions, 0.0);
-										}
-									}
-								}
-							}
-						}
-					}
-				}
-			}
-		}
+std::vector<double>& GetQValues(const std::string& state) {
+	if (QTable.find(state) == QTable.end()) { // Search the QTable for state, if it does not find the state, 
+	// it will return QTable.end() iterator, which suggests it has reached the end of the QTable.
+		QTable[state] = std::vector<double>(numActions, 0.0); // Initialise the q values in the q table.
 	}
+	return QTable[state];
 }
 
 // Q Learning Algorithm
@@ -235,8 +207,8 @@ void InitialiseQTable() {
 // Choose action, either select the best known action or try a random action to potentially find better option, epsilon greedy.
 
 double alpha = 0.1; // Learning rate: the size of step update.
-double gamma = 0.9; // Discount factor: measures the importance of future rewards.
-double epsilon = 0.1; // Exploration rate: the probability of choosing a random action instead of best known action.
+double gamma_ = 0.9; // Discount factor: measures the importance of future rewards.
+double epsilon = 0.5; // Exploration rate: the probability of choosing a random action instead of best known action.
 
 // Function to choose next action, epsilon greedy.
 
@@ -244,6 +216,7 @@ Actions ChooseAction(const std::string &state) {
 	if (GetRandomValue(0, 100) < epsilon * 100) { // If random value is below exploration rate threshold, choose random action.
 		return static_cast<Actions>(GetRandomValue(0, numActions - 1)); // Cast an integer to actions type.
 	} else {
+		GetQValues(state); // Search the QTable for the state if it does not exist set it up
 		auto &qValues = QTable[state]; // Return the q values from the Q table.
 		return static_cast<Actions>(std::max_element(qValues.begin(), qValues.end()) - qValues.begin()); // Return the position of the maximum element. 
 		// Which corresponds to an action. Find the max element (returning an iterator - a pointer to the element in the vector) and the  minus it away
@@ -254,10 +227,12 @@ Actions ChooseAction(const std::string &state) {
 // Updating Q values. Will utilise the Q value update formula and also get the q values for current and next state.
 
 void UpdateQTable(const std::string &state, Actions action, double reward, const std::string &nextState) {
-	auto &qVlaues = QTable[state];
+	GetQValues(nextState); // Search the QTable for nextState, if it does not exist initialise it.
+	auto &qValues = QTable[state];
 	double maxFutureQ = *std::max_element(QTable[nextState].begin(), QTable[nextState].end()); // Dereference the max q value of the q values of the next state.
 	// Need to dereference as the variable maxFutureQ will point to the element in the vector instead of the actual value. The type would be std::vector<double>
 	// ::iterator.
+	qValues[action] += alpha * (reward + gamma_ * maxFutureQ - qValues[action]); // Q value update formula
 }
 
 // Reward function
@@ -269,9 +244,91 @@ double GetReward(const Snake &snake, const Food &food) {
 	return -0.1; // Time penalty
 }
 
+template<typename T>
+
+void outputDebugFiles(std::string outputFilename, const T& outputVariable, std::string outputDescription) {
+	std::ofstream outputFile(outputFilename); // Create an output file stream
+
+    if (outputFile.is_open()) { // Check if the file is successfully opened
+        // Write data to the file
+        outputFile << outputDescription << " " << outputVariable << std::endl;
+
+        // Close the file stream
+        outputFile.close();
+        std::cout << "Data has been written to output.txt" << std::endl;
+    } else {
+        std::cerr << "Error: Unable to open output file." << std::endl;
+    }
+}
+
+
+
+void PrintQValues(const std::string& state) {
+    if (QTable.find(state) != QTable.end()) {
+        const std::vector<double>& qValues = QTable[state];
+        std::cout << "Q-values for state \"" << state << "\":" << std::endl;
+        for (size_t i = 0; i < qValues.size(); ++i) {
+            std::cout << "Action " << i << ": " << qValues[i] << std::endl;
+        }
+    } else {
+        std::cout << "State \"" << state << "\" not found in Q-table." << std::endl;
+    }
+}
+
+// Function to print QTable for debugging
+void PrintQTable() {
+    for (const auto& pair : QTable) {
+        const std::string& state = pair.first;
+        const std::vector<double>& qValues = pair.second;
+
+        std::ostringstream oss;
+        oss << "Q-values for state \"" << state << "\":\n";
+        for (size_t i = 0; i < qValues.size(); ++i) {
+            oss << "Action " << i << ": " << qValues[i] << "\n";
+        }
+        std::cout << oss.str() << std::endl;
+    }
+}
+
+void OutputQTableToFile(const std::string& filename) {
+    std::ofstream outFile(filename);
+
+    if (!outFile.is_open()) {
+        std::cerr << "Error opening file for writing: " << filename << std::endl;
+        return;
+    }
+
+    for (const auto& pair : QTable) {
+        const std::string& state = pair.first;
+        const std::vector<double>& qValues = pair.second;
+
+        outFile << "State: " << state << std::endl;
+        for (int action = 0; action < numActions; ++action) {
+            outFile << "  Action " << action << ": " << qValues[action] << std::endl;
+        }
+    }
+
+    outFile.close();
+    std::cout << "QTable output to file " << filename << " successfully." << std::endl;
+}
+
+void outputAllActions(const std::string& filename, std::string& state, const Actions& chosenAction, const Vector2& snakeDirection) {
+	std::ofstream outFile(filename, std::ios::app);
+
+    if (!outFile.is_open()) {
+        std::cerr << "Error opening file for writing: " << filename << std::endl;
+        return;
+    }
+
+	outFile << "Current state: " << state << std::endl;
+	outFile << "  Chosen action: " << chosenAction << std::endl;
+	for (int directionElement = 0; directionElement < 2; ++directionElement) {
+		outFile << "  snake.game.direction: " << directionElement << std::endl;
+	}
+}
+
 int main() {
 	// Initialise game, create game window and set FPS.
-	std::cout << "Starting new game..." << std::endl;
 	InitWindow(2 * offset + cellSize * cellCount, 2 * offset + cellSize * cellCount, "Retro Snake");
 	SetTargetFPS(60);
 
@@ -286,12 +343,41 @@ int main() {
 			std::string state = GetState(game.snake, game.food);
 			Actions action = ChooseAction(state);
 
+			std::cout << "state: " << state << std::endl;
+			std::cout << "Chosen action: " << action << std::endl;
+
 			switch (action) {
-				case UP: game.snake.direction = {0, -1}; break;
-				case DOWN: game.snake.direction = {0, 1}; break;
-				case LEFT: game.snake.direction = {-1, 0}; break;
-				case RIGHT: game.snake.direction = {1, }; break;
+				case UP:
+					// Check if the current direction is not already downwards
+					if (game.snake.direction.y != 1) {
+						game.snake.direction = {0, -1};
+						game.gameRunning = true;
+					}
+					break;
+				case DOWN:
+					// Check if the current direction is not already upwards
+					if (game.snake.direction.y != -1) {
+						game.snake.direction = {0, 1};
+						game.gameRunning = true;
+					}
+					break;
+				case LEFT:
+					// Check if the current direction is not already to the right
+					if (game.snake.direction.x != 1) {
+						game.snake.direction = {-1, 0};
+						game.gameRunning = true;
+					}
+					break;
+				case RIGHT:
+					// Check if the current direction is not already to the left
+					if (game.snake.direction.x != -1) {
+						game.snake.direction = {1, 0};
+						game.gameRunning = true;
+					}
+					break;
 			}
+
+			std::cout << "Snake direction: (" << game.snake.direction.x << ", " << game.snake.direction.y << ")" << std::endl;
 
 			game.Update();
 
@@ -299,8 +385,9 @@ int main() {
 			double reward = GetReward(game.snake, game.food);
 
 			UpdateQTable(state, action, reward, nextState);
-		}
 
+            outputAllActions("action_history.txt", state, action, game.snake.direction);
+		}
 
 		// Player input for moving
 		// if (IsKeyPressed(KEY_UP) && game.snake.direction.y != 1) {
@@ -328,6 +415,8 @@ int main() {
 		game.Draw();
 		EndDrawing();
 	};
+
+	OutputQTableToFile("qtable_output.txt");
 
 	CloseWindow();
 	return 0;
