@@ -232,6 +232,42 @@ void InitialiseQTable() {
 
 // Q Learning Algorithm
 
+// Choose action, either select the best known action or try a random action to potentially find better option, epsilon greedy.
+
+double alpha = 0.1; // Learning rate: the size of step update.
+double gamma = 0.9; // Discount factor: measures the importance of future rewards.
+double epsilon = 0.1; // Exploration rate: the probability of choosing a random action instead of best known action.
+
+// Function to choose next action, epsilon greedy.
+
+Actions ChooseAction(const std::string &state) {
+	if (GetRandomValue(0, 100) < epsilon * 100) { // If random value is below exploration rate threshold, choose random action.
+		return static_cast<Actions>(GetRandomValue(0, numActions - 1)); // Cast an integer to actions type.
+	} else {
+		auto &qValues = QTable[state]; // Return the q values from the Q table.
+		return static_cast<Actions>(std::max_element(qValues.begin(), qValues.end()) - qValues.begin()); // Return the position of the maximum element. 
+		// Which corresponds to an action. Find the max element (returning an iterator - a pointer to the element in the vector) and the  minus it away
+		// from the first q value element of the vector to attain the position of the element.
+	}
+}
+
+// Updating Q values. Will utilise the Q value update formula and also get the q values for current and next state.
+
+void UpdateQTable(const std::string &state, Actions action, double reward, const std::string &nextState) {
+	auto &qVlaues = QTable[state];
+	double maxFutureQ = *std::max_element(QTable[nextState].begin(), QTable[nextState].end()); // Dereference the max q value of the q values of the next state.
+	// Need to dereference as the variable maxFutureQ will point to the element in the vector instead of the actual value. The type would be std::vector<double>
+	// ::iterator.
+}
+
+// Reward function
+
+double GetReward(const Snake &snake, const Food &food) {
+	if (Vector2Equals(snake.body[0], food.position)) return 10.0; // Food eaten
+	if (ElementInDeque(snake.body[0], snake.body)) return -10.0; // Collision with self.
+	if (snake.body[0].x < 0 || snake.body[0].x >= cellCount || snake.body[0].y < 0 || snake.body[0].y >= cellCount) return -10.0; // Collision with walls
+	return -0.1; // Time penalty
+}
 
 int main() {
 	// Initialise game, create game window and set FPS.
@@ -247,27 +283,42 @@ int main() {
 		BeginDrawing();
 
 		if (eventTriggered(0.2)) {
+			std::string state = GetState(game.snake, game.food);
+			Actions action = ChooseAction(state);
+
+			switch (action) {
+				case UP: game.snake.direction = {0, -1}; break;
+				case DOWN: game.snake.direction = {0, 1}; break;
+				case LEFT: game.snake.direction = {-1, 0}; break;
+				case RIGHT: game.snake.direction = {1, }; break;
+			}
+
 			game.Update();
+
+			std::string nextState = GetState(game.snake, game.food);
+			double reward = GetReward(game.snake, game.food);
+
+			UpdateQTable(state, action, reward, nextState);
 		}
 
 
 		// Player input for moving
-		if (IsKeyPressed(KEY_UP) && game.snake.direction.y != 1) {
-			game.snake.direction = {0, -1};
-			game.gameRunning = true;
-		}
-		if (IsKeyPressed(KEY_DOWN) && game.snake.direction.y != -1) {
-			game.snake.direction = {0, 1};
-			game.gameRunning = true;
-		}
-		if (IsKeyPressed(KEY_LEFT) && game.snake.direction.x != 1) {
-			game.snake.direction = {-1, 0};
-			game.gameRunning = true;
-		}
-		if (IsKeyPressed(KEY_RIGHT) && game.snake.direction.x != -1) {
-			game.snake.direction = {1, 0};
-			game.gameRunning = true;
-		}
+		// if (IsKeyPressed(KEY_UP) && game.snake.direction.y != 1) {
+		// 	game.snake.direction = {0, -1};
+		// 	game.gameRunning = true;
+		// }
+		// if (IsKeyPressed(KEY_DOWN) && game.snake.direction.y != -1) {
+		// 	game.snake.direction = {0, 1};
+		// 	game.gameRunning = true;
+		// }
+		// if (IsKeyPressed(KEY_LEFT) && game.snake.direction.x != 1) {
+		// 	game.snake.direction = {-1, 0};
+		// 	game.gameRunning = true;
+		// }
+		// if (IsKeyPressed(KEY_RIGHT) && game.snake.direction.x != -1) {
+		// 	game.snake.direction = {1, 0};
+		// 	game.gameRunning = true;
+		// }
 
 		// Drawing
 		ClearBackground(green);
