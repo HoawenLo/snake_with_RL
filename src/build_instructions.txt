@@ -1,0 +1,8 @@
+Ensure CMAKE downloaded.
+
+1) mkdir build
+2) cd build
+3) cmake .. -DCMAKE_PREFIX_PATH=/absolute/path/to/libtorch
+cmake .. -DCMAKE_PREFIX_PATH=C:/c++_libs/libtorch
+4) cmake --build . --config Release
+5) Move executable to out of src.
