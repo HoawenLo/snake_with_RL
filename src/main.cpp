@@ -7,6 +7,9 @@
 #include <unordered_map>
 #include "include/raylib.h"
 #include "include/raymath.h"
+#include <torch/torch.h>
+#include "raylib.h"
+
 
 Color green = {173, 204, 96, 255};
 Color darkGreen = {43, 51, 24, 255};
@@ -147,7 +150,7 @@ public:
 
 	void GameOver() {
 		snake.Reset();
-		food.position = food.GenerateRandomPos(snake.body);
+		// food.position = food.GenerateRandomPos(snake.body);
 		gameRunning = false;
 		score = 0;
 	}
@@ -208,11 +211,11 @@ std::vector<double>& GetQValues(const std::string& state) {
 
 double alpha = 0.1; // Learning rate: the size of step update.
 double gamma_ = 0.9; // Discount factor: measures the importance of future rewards.
-double epsilon = 0.5; // Exploration rate: the probability of choosing a random action instead of best known action.
+
 
 // Function to choose next action, epsilon greedy.
 
-Actions ChooseAction(const std::string &state) {
+Actions ChooseAction(const std::string &state, double epsilon) {
 	if (GetRandomValue(0, 100) < epsilon * 100) { // If random value is below exploration rate threshold, choose random action.
 		return static_cast<Actions>(GetRandomValue(0, numActions - 1)); // Cast an integer to actions type.
 	} else {
@@ -238,9 +241,9 @@ void UpdateQTable(const std::string &state, Actions action, double reward, const
 // Reward function
 
 double GetReward(const Snake &snake, const Food &food) {
-	if (Vector2Equals(snake.body[0], food.position)) return 10.0; // Food eaten
-	if (ElementInDeque(snake.body[0], snake.body)) return -10.0; // Collision with self.
-	if (snake.body[0].x < 0 || snake.body[0].x >= cellCount || snake.body[0].y < 0 || snake.body[0].y >= cellCount) return -10.0; // Collision with walls
+	if (Vector2Equals(snake.body[0], food.position)) return 50.0; // Food eaten
+	// if (ElementInDeque(snake.body[0], snake.body)) return -10.0; // Collision with self.
+	if (snake.body[0].x < 0 || snake.body[0].x >= cellCount || snake.body[0].y < 0 || snake.body[0].y >= cellCount) return -50.0; // Collision with walls
 	return -0.1; // Time penalty
 }
 
@@ -312,7 +315,23 @@ void OutputQTableToFile(const std::string& filename) {
     std::cout << "QTable output to file " << filename << " successfully." << std::endl;
 }
 
-void outputAllActions(const std::string& filename, std::string& state, const Actions& chosenAction, const Vector2& snakeDirection) {
+void outputVector2(const Vector2& vectorValues, std::string vectorName, std::ofstream& outFile) {
+	outFile << "  " << vectorName << " x: " << vectorValues.x << std::endl;
+	outFile << "  " << vectorName << " y: " << vectorValues.y << std::endl;
+}
+
+std::string actionToString(Actions action) {
+    switch (action) {
+        case UP: return "UP";
+        case DOWN: return "DOWN";
+        case LEFT: return "LEFT";
+        case RIGHT: return "RIGHT";
+        // Add other cases for other actions
+        default: return "UNKNOWN";
+    }
+}
+
+void outputAllActions(const std::string& filename, std::string& state, const Actions& chosenAction, const Vector2& snakeDirection, const Vector2& snakeHead, const Vector2& foodPosition, const double& reward) {
 	std::ofstream outFile(filename, std::ios::app);
 
     if (!outFile.is_open()) {
@@ -321,13 +340,26 @@ void outputAllActions(const std::string& filename, std::string& state, const Act
     }
 
 	outFile << "Current state: " << state << std::endl;
-	outFile << "  Chosen action: " << chosenAction << std::endl;
-	for (int directionElement = 0; directionElement < 2; ++directionElement) {
-		outFile << "  snake.game.direction: " << directionElement << std::endl;
-	}
+	outFile << "  Chosen action: " << actionToString(chosenAction) << std::endl;
+	outFile << "  Reward value: " << reward << std::endl;
+	outputVector2(snakeHead, "Snake head position", outFile);
+	outputVector2(foodPosition, "Food position", outFile);
+	outputVector2(snakeDirection, "Snake direction", outFile);
+
+}
+
+double decayEpsilon(double epsilon, double decayRate) {
+	return epsilon * decayRate;
 }
 
 int main() {
+
+	torch::Tensor tensor = torch::eye(3);
+    std::cout << "Tensor:\n" << tensor << std::endl;
+
+
+	double epsilon = 0.9; // Exploration rate: the probability of choosing a random action instead of best known action.
+	double epsilonDecayRate = 0.999; // The epsilon decay rate.
 	// Initialise game, create game window and set FPS.
 	InitWindow(2 * offset + cellSize * cellCount, 2 * offset + cellSize * cellCount, "Retro Snake");
 	SetTargetFPS(60);
@@ -341,7 +373,7 @@ int main() {
 
 		if (eventTriggered(0.2)) {
 			std::string state = GetState(game.snake, game.food);
-			Actions action = ChooseAction(state);
+			Actions action = ChooseAction(state, epsilon);
 
 			std::cout << "state: " << state << std::endl;
 			std::cout << "Chosen action: " << action << std::endl;
@@ -386,7 +418,13 @@ int main() {
 
 			UpdateQTable(state, action, reward, nextState);
 
-            outputAllActions("action_history.txt", state, action, game.snake.direction);
+            outputAllActions("action_history.txt", state, action, game.snake.direction, game.snake.body[0], game.food.position, reward);
+
+			// Apply decay rate
+			std::cout << "Epsilon before" << epsilon << std::endl;
+			epsilon = decayEpsilon(epsilon, epsilonDecayRate);
+			std::cout << "Epsilon after" << epsilon << std::endl;
+
 		}
 
 		// Player input for moving
