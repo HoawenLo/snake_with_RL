@@ -2,8 +2,10 @@
 #include <deque>
 #include <fstream>
 #include <iostream>
+#include <random>
 #include <string>
 #include <sstream>
+#include <tuple>
 #include <unordered_map>
 #include "include/raylib.h"
 #include "include/raymath.h"
@@ -195,57 +197,100 @@ std::string GetState(const Snake &snake, const Food &food) {
 	return state;
 }
 
-std::unordered_map<std::string, std::vector<double>> QTable;
-
-std::vector<double>& GetQValues(const std::string& state) {
-	if (QTable.find(state) == QTable.end()) { // Search the QTable for state, if it does not find the state, 
-	// it will return QTable.end() iterator, which suggests it has reached the end of the QTable.
-		QTable[state] = std::vector<double>(numActions, 0.0); // Initialise the q values in the q table.
-	}
-	return QTable[state];
-}
 
 // Q Learning Algorithm
 
-// Choose action, either select the best known action or try a random action to potentially find better option, epsilon greedy.
+// Neural network
 
-double alpha = 0.1; // Learning rate: the size of step update.
-double gamma_ = 0.9; // Discount factor: measures the importance of future rewards.
+// Deep Q Network, inherits from the base neural network class.
+struct DQN : torch::nn:Module {
+	// Setup three linear layers
+	torch::nn:Linear fc1{nullptr}, fc2{nullptr}, fc3{nullptr};
 
+	// Constructor to take inputs for the input size (number of parameters of a state)
+	// and the output size (number of actions - 4)
+	DQN(int state_size, int action_size) {
+		// register_module comes from the custom neural network module torch::nn::Module
+		// Allows registering of child modules within the current module. Inputs are
+		// name and layer - module.
+		fc1 = register_module("fc1", torch::nn:Linear(state_size, 128));
+		fc2 = register_module("fc2", torch::nn:Linear(128, 64));
+		fc3 = register_module("fc3", torch::nn:Linear(64, action_size));
+	}
 
-// Function to choose next action, epsilon greedy.
-
-Actions ChooseAction(const std::string &state, double epsilon) {
-	if (GetRandomValue(0, 100) < epsilon * 100) { // If random value is below exploration rate threshold, choose random action.
-		return static_cast<Actions>(GetRandomValue(0, numActions - 1)); // Cast an integer to actions type.
-	} else {
-		GetQValues(state); // Search the QTable for the state if it does not exist set it up
-		auto &qValues = QTable[state]; // Return the q values from the Q table.
-		return static_cast<Actions>(std::max_element(qValues.begin(), qValues.end()) - qValues.begin()); // Return the position of the maximum element. 
-		// Which corresponds to an action. Find the max element (returning an iterator - a pointer to the element in the vector) and the  minus it away
-		// from the first q value element of the vector to attain the position of the element.
+	// Forward pass method
+	// Layers are inherited from base class, they are pointers, hence need to dereference
+	// to access its methods.
+	torch::Tensor forward(torch::Tensor x) {
+		x = torch::relu(fc1->forward(x));
+		x = torch::relu(fc2->forward(x));
+		x = fc3->forward(x);
+		return x;
 	}
 }
 
-// Updating Q values. Will utilise the Q value update formula and also get the q values for current and next state.
+// Create a type Experience where elements are
+// torch::Tensor state
+// int action
+// double reward
+// torch::Tensor next_state
+// bool done - indicates whether an episode terminated after taking an action, required
+// as end states are handled differently, the next state is omitted as it does not
+// exist.
+using Experience = std::tuple<torch::Tensor, int, double, torch::Tensor, bool>;
 
-void UpdateQTable(const std::string &state, Actions action, double reward, const std::string &nextState) {
-	GetQValues(nextState); // Search the QTable for nextState, if it does not exist initialise it.
-	auto &qValues = QTable[state];
-	double maxFutureQ = *std::max_element(QTable[nextState].begin(), QTable[nextState].end()); // Dereference the max q value of the q values of the next state.
-	// Need to dereference as the variable maxFutureQ will point to the element in the vector instead of the actual value. The type would be std::vector<double>
-	// ::iterator.
-	qValues[action] += alpha * (reward + gamma_ * maxFutureQ - qValues[action]); // Q value update formula
+// deque to store memory
+std::deque<Experience> replay_memory;
+const int MEMORY_CAPACITY = 10000;
+
+void store_experience(const torch::Tensor state, int action, double reward, const torch::Tensor& next_state, bool done) {
+	if (replay_memory.size() >= MEMORY_CAPACITY) {
+		replay_memory.pop_front();
+	}
+	replay_memory.push_back(std::make_tuple(state, action, reward, next_state, done));
 }
 
-// Reward function
+// Initialise hyperparameters
 
-double GetReward(const Snake &snake, const Food &food) {
-	if (Vector2Equals(snake.body[0], food.position)) return 50.0; // Food eaten
-	// if (ElementInDeque(snake.body[0], snake.body)) return -10.0; // Collision with self.
-	if (snake.body[0].x < 0 || snake.body[0].x >= cellCount || snake.body[0].y < 0 || snake.body[0].y >= cellCount) return -50.0; // Collision with walls
-	return -0.1; // Time penalty
+const int BATCH_SIZE = 64; // Number of experiences to sample for each training step
+const double GAMMA = 0.99; // Discount factor for future rewards - measure importance of future rewards
+const double EPSILON_START = 1.0; // Parameters for epsilon greedy with decay - if below epsilon threshold action will be random.
+const double EPSILON_END = 0.1;
+const double EPSILON_DECAY = 1000;
+const int TARGET_UPDATE = 10;
+
+DQN policy_net(state_size, action_size); // Neural network used for selecting actions
+DQN target_net(state_size, action_size); // Neural network copy used for stable Q-value updates
+torch::optim::Adam optimizer(policy_net.parameters(), torch::optim::AdamOptions(0.001)); // Setup optimiser
+
+target_net.load_state_dict(policy_net.state_dict()) // Copy the weights and biases of policy_net to target_net
+target_net.eval(); // Set to evaluation mode
+
+std::random_device rd; // Create random device to produce random numbers
+std::mt19937 gen(rd()); // Use Mersenne Twister generator with seed provided by rd
+std::uniform_real_distribution<> dis(0.0, 1.0); // Defines a uniform real distribution that produce random floating point number in range 0.0 to 1.0.
+
+int steps_done = 0; // Count the number of steps done to decay epsilon
+
+// Action selection function
+int select_action(const torch::Tensor& state) {
+	double epsilon = EPSILON_END + (EPSILON_START - EPSILON_END) * exp(-1.0 * steps_done / EPSILON_DECAY); // Decay function
+	steps_done++; // Increment steps done
+	if (dis(gen) > epsilon) { // If generated value above epsilon threshold choose best action.
+		auto q_values = policy_net.forward(state); // Forward pass state through policy_net 
+		return q_values.argmax(1).item<int>(); // First find the index of the maximum element of the tensor, returns a tensor corresponding to that index, then convert this index to an integer.
+	} else {
+		std::uniform_int_distribution<> action_dis(0, action_size - 1); // Select random action
+		return action_dis(gen)
+	}
 }
+
+void optimizer_model() {
+	
+}
+
+
+// Debugging
 
 template<typename T>
 
@@ -263,8 +308,6 @@ void outputDebugFiles(std::string outputFilename, const T& outputVariable, std::
         std::cerr << "Error: Unable to open output file." << std::endl;
     }
 }
-
-
 
 void PrintQValues(const std::string& state) {
     if (QTable.find(state) != QTable.end()) {
