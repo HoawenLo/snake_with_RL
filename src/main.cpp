@@ -170,7 +170,7 @@ enum Actions { UP, DOWN, LEFT, RIGHT };
 const int numActions = 4;
 
 // A function to get the state representation
-std::string GetState(const Snake &snake, const Food &food) {
+torch::Tensor GetState(const Snake &snake, const Food &food) {
 	Vector2 head = snake.body[0];
 	Vector2 foodPos = food.position;
 	Vector2 direction = snake.direction;
@@ -188,11 +188,23 @@ std::string GetState(const Snake &snake, const Food &food) {
 	if (ElementInDeque(Vector2{head.x - 1, head.y}, snake.body) || head.x - 1 < 0) obstacleLeft = true;
 	if (ElementInDeque(Vector2{head.x + 1, head.y}, snake.body) || head.x + 1 >= cellCount) obstacleRight = true;
 
-	std::string state = std::to_string((int)head.x) + "_" + std::to_string((int)head.y) + "_" +
-						std::to_string((int)foodPos.x) + "_" + std::to_string((int)foodPos.y) + "_" +
-						std::to_string((int)direction.x) + "_" + std::to_string((int)direction.y) + "_" +
-						std::to_string(obstacleUp) + "_" + std::to_string(obstacleDown) + "_" +
-						std::to_string(obstacleLeft) + "_" + std::to_string(obstacleRight);
+	float normalisedHeadX = head.x / (float)cellCount;
+	float normalisedHeadY = head.y / (float)cellCount;
+	float normalisedFoodX = foodPos.x / (float)cellCount;
+	float normalisedFoodY = foodPos.y / (float)cellCount;
+
+	auto state = torch::tensor({
+		normalisedHeadX,
+        normalisedHeadY,
+        normalisedFoodX,
+        normalisedFoodY,
+        direction.x,
+        direction.y,
+        (float)obstacleUp,
+        (float)obstacleDown,
+        (float)obstacleLeft,
+        (float)obstacleRight
+	});
 
 	return state;
 }
@@ -203,9 +215,9 @@ std::string GetState(const Snake &snake, const Food &food) {
 // Neural network
 
 // Deep Q Network, inherits from the base neural network class.
-struct DQN : torch::nn:Module {
+struct DQN : torch::nn::Module {
 	// Setup three linear layers
-	torch::nn:Linear fc1{nullptr}, fc2{nullptr}, fc3{nullptr};
+	torch::nn::Linear fc1{nullptr}, fc2{nullptr}, fc3{nullptr};
 
 	// Constructor to take inputs for the input size (number of parameters of a state)
 	// and the output size (number of actions - 4)
@@ -213,20 +225,39 @@ struct DQN : torch::nn:Module {
 		// register_module comes from the custom neural network module torch::nn::Module
 		// Allows registering of child modules within the current module. Inputs are
 		// name and layer - module.
-		fc1 = register_module("fc1", torch::nn:Linear(state_size, 128));
-		fc2 = register_module("fc2", torch::nn:Linear(128, 64));
-		fc3 = register_module("fc3", torch::nn:Linear(64, action_size));
+		fc1 = register_module("fc1", torch::nn::Linear(state_size, 128));
+		fc2 = register_module("fc2", torch::nn::Linear(128, 64));
+		fc3 = register_module("fc3", torch::nn::Linear(64, action_size));
 	}
 
 	// Forward pass method
 	// Layers are inherited from base class, they are pointers, hence need to dereference
 	// to access its methods.
 	torch::Tensor forward(torch::Tensor x) {
-		x = torch::relu(fc1->forward(x));
-		x = torch::relu(fc2->forward(x));
+		x = torch::nn::functional::relu(fc1->forward(x));
+		x = torch::nn::functional::relu(fc2->forward(x));
 		x = fc3->forward(x);
 		return x;
 	}
+};
+
+void loadstatedict(torch::nn::Module& model, torch::nn::Module& target_model) {
+torch::autograd::GradMode::set_enabled(false);  // make parameters copying possible
+auto new_params = target_model.named_parameters(); // implement this
+auto params = model.named_parameters(true /*recurse*/);
+auto buffers = model.named_buffers(true /*recurse*/);
+for (auto& val : new_params) {
+    auto name = val.key();
+    auto* t = params.find(name);
+    if (t != nullptr) {
+        t->copy_(val.value());
+    } else {
+        t = buffers.find(name);
+        if (t != nullptr) {
+            t->copy_(val.value());
+            }
+        }
+    }
 }
 
 // Create a type Experience where elements are
@@ -237,13 +268,13 @@ struct DQN : torch::nn:Module {
 // bool done - indicates whether an episode terminated after taking an action, required
 // as end states are handled differently, the next state is omitted as it does not
 // exist.
-using Experience = std::tuple<torch::Tensor, int, double, torch::Tensor, bool>;
+using Experience = std::tuple<torch::Tensor, int, double, torch::Tensor, int>;
 
 // deque to store memory
 std::deque<Experience> replay_memory;
 const int MEMORY_CAPACITY = 10000;
 
-void store_experience(const torch::Tensor state, int action, double reward, const torch::Tensor& next_state, bool done) {
+void storeExperience(const torch::Tensor state, int action, double reward, const torch::Tensor& next_state, int done) {
 	if (replay_memory.size() >= MEMORY_CAPACITY) {
 		replay_memory.pop_front();
 	}
@@ -259,12 +290,8 @@ const double EPSILON_END = 0.1;
 const double EPSILON_DECAY = 1000;
 const int TARGET_UPDATE = 10;
 
-DQN policy_net(state_size, action_size); // Neural network used for selecting actions
-DQN target_net(state_size, action_size); // Neural network copy used for stable Q-value updates
-torch::optim::Adam optimizer(policy_net.parameters(), torch::optim::AdamOptions(0.001)); // Setup optimiser
-
-target_net.load_state_dict(policy_net.state_dict()) // Copy the weights and biases of policy_net to target_net
-target_net.eval(); // Set to evaluation mode
+DQN policy_net(10, 4); // Neural network used for selecting actions
+DQN target_net(10, 4); // Neural network copy used for stable Q-value updates
 
 std::random_device rd; // Create random device to produce random numbers
 std::mt19937 gen(rd()); // Use Mersenne Twister generator with seed provided by rd
@@ -273,153 +300,126 @@ std::uniform_real_distribution<> dis(0.0, 1.0); // Defines a uniform real distri
 int steps_done = 0; // Count the number of steps done to decay epsilon
 
 // Action selection function
-int select_action(const torch::Tensor& state) {
+int selectAction(const torch::Tensor& state) {
 	double epsilon = EPSILON_END + (EPSILON_START - EPSILON_END) * exp(-1.0 * steps_done / EPSILON_DECAY); // Decay function
 	steps_done++; // Increment steps done
 	if (dis(gen) > epsilon) { // If generated value above epsilon threshold choose best action.
+		std::cout << "Finally using forward." << std::endl;
 		auto q_values = policy_net.forward(state); // Forward pass state through policy_net 
 		return q_values.argmax(1).item<int>(); // First find the index of the maximum element of the tensor, returns a tensor corresponding to that index, then convert this index to an integer.
 	} else {
-		std::uniform_int_distribution<> action_dis(0, action_size - 1); // Select random action
-		return action_dis(gen)
+		std::uniform_int_distribution<> action_dis(0, 3); // Select random action
+		return action_dis(gen);
 	}
 }
 
-void optimizer_model() {
+torch::Tensor calculateLoss() {
+	std::vector<Experience> batch(BATCH_SIZE); // Initialise a vector called batch, of size BATCH_SIZE, with default valued Experience tuples.
+	std::sample(replay_memory.begin(), replay_memory.end(), batch.begin(), BATCH_SIZE, gen); 
+	// Sample experience tuples from the replay memory, storing them in batch, storing BATCH_SIZE number of experiences, using generator gen.
+
+	// Set up vectors to store state variables
+	std::vector<torch::Tensor> state_batch, next_state_batch;
+	std::vector<int> action_batch;
+	std::vector<double> reward_batch;
+	std::vector<int> done_batch;
+
+	for (const auto& experience: batch) { // Iterate over the batch vector. Syntax (loop variable : container to be looped over)
+		state_batch.push_back(std::get<0>(experience)); // For each batch vector get the relevant element from the experience tuple and push it into the batch vector.
+		action_batch.push_back(std::get<1>(experience));
+		reward_batch.push_back(std::get<2>(experience));
+		next_state_batch.push_back(std::get<3>(experience));
+		done_batch.push_back(std::get<4>(experience));
+	}
+
+	auto state_tensor = torch::stack(state_batch); // Stack the state_batch vector which contains state_batch as torch::tensors 
+	auto next_state_tensor = torch::stack(next_state_batch); // Do the same for next_state_batch
+
+	auto action_options = torch::TensorOptions().dtype(torch::kInt64);
+	auto reward_options = torch::TensorOptions().dtype(torch::kFloat64);
+	auto done_options = torch::TensorOptions().dtype(torch::kInt64);
+
+	auto action_tensor = torch::from_blob(action_batch.data(), {static_cast<int>(action_batch.size())}, action_options); // Convert the action batch vector (a vector of integers) to a torch::tensor, stating the datatype.
+	auto reward_tensor = torch::from_blob(reward_batch.data(), {static_cast<long>(reward_batch.size())}, reward_options); // Convert the reward batch vector (a vector of doubles) to a torch tensor.
+	auto done_tensor = torch::from_blob(done_batch.data(), {static_cast<int>(done_batch.size())}, done_options); // Convert the done batch vector (a vector of Booleans) to a torch tensor with datatype torch::kBool.
+
+	auto q_values = policy_net.forward(state_tensor).gather(1, action_tensor.unsqueeze(1)).squeeze(1); // From the action tensor, select the corresponding elements.
 	
+	// Calculate the maximum Q value for the next state q values. A tuple is returned, hence use .values() to extract the values.
+	auto next_q_values = target_net.forward(next_state_tensor);
+	auto max_next_q_values = std::get<0>(torch::max({next_q_values}, 0));
+
+	auto expected_q_values = reward_tensor + (GAMMA * next_q_values * done_tensor); // Calculate the expected q values with Bellman equation. If the state has terminated, the done tensor will be true, 
+	// hence inverting the done tensor will set it to false, meaning the calculation will yield only the reward tensor.
+
+	// torch::Tensor loss = torch::mse_loss(q_values, expected_q_values); // Calculate the loss]
+
+	// Perform ack propagation and update network parameters
+
+	return torch::mse_loss(q_values, expected_q_values);
+}
+
+double GetReward(const Snake &snake, const Food &food) {
+	if (Vector2Equals(snake.body[0], food.position)) return 100.0; // Food eaten
+	if (ElementInDeque(snake.body[0], snake.body)) return -10.0; // Collision with self.
+	if (snake.body[0].x < 0 || snake.body[0].x >= cellCount || snake.body[0].y < 0 || snake.body[0].y >= cellCount) return -10.0; // Collision with walls
+	return -0.1; // Time penalty
 }
 
 
-// Debugging
 
-template<typename T>
 
-void outputDebugFiles(std::string outputFilename, const T& outputVariable, std::string outputDescription) {
-	std::ofstream outputFile(outputFilename); // Create an output file stream
+void outputProgramState (std::ofstream& outFile, int episode, int action, torch::Tensor state, double reward, int replay_memory_size, std::deque<Experience> replay_memory) {
+	outFile << "======================================================" << std::endl;
+	outFile << "episode: " << episode << std::endl;
+	outFile << "action: " << action << std::endl;
+	outFile << "--------------------------------------------------" << std::endl;
+	for (int i = 0; i < state.size(0); ++i) {
+		outFile << "state var: " << state[i].item<float>() << std::endl;
+	}
+	outFile << "--------------------------------------------------" << std::endl;
+	outFile << "reward: " << reward << std::endl;
+	outFile << "replay_memory_size : " << replay_memory_size << std::endl;
+	outFile << "--------------------------------------------------" << std::endl;
+	for (int i = 0; i < replay_memory.size(); ++i) {
+		outFile << "replay memory: " << std::get<0>(replay_memory[i]) << std::endl;
+		outFile << "replay memory: " << std::get<1>(replay_memory[i]) << std::endl;
+		outFile << "replay memory: " << std::get<2>(replay_memory[i]) << std::endl;
+		outFile << "replay memory: " << std::get<3>(replay_memory[i]) << std::endl;
+		outFile << "replay memory: " << std::get<4>(replay_memory[i]) << std::endl;
+	}
 
-    if (outputFile.is_open()) { // Check if the file is successfully opened
-        // Write data to the file
-        outputFile << outputDescription << " " << outputVariable << std::endl;
-
-        // Close the file stream
-        outputFile.close();
-        std::cout << "Data has been written to output.txt" << std::endl;
-    } else {
-        std::cerr << "Error: Unable to open output file." << std::endl;
-    }
-}
-
-void PrintQValues(const std::string& state) {
-    if (QTable.find(state) != QTable.end()) {
-        const std::vector<double>& qValues = QTable[state];
-        std::cout << "Q-values for state \"" << state << "\":" << std::endl;
-        for (size_t i = 0; i < qValues.size(); ++i) {
-            std::cout << "Action " << i << ": " << qValues[i] << std::endl;
-        }
-    } else {
-        std::cout << "State \"" << state << "\" not found in Q-table." << std::endl;
-    }
-}
-
-// Function to print QTable for debugging
-void PrintQTable() {
-    for (const auto& pair : QTable) {
-        const std::string& state = pair.first;
-        const std::vector<double>& qValues = pair.second;
-
-        std::ostringstream oss;
-        oss << "Q-values for state \"" << state << "\":\n";
-        for (size_t i = 0; i < qValues.size(); ++i) {
-            oss << "Action " << i << ": " << qValues[i] << "\n";
-        }
-        std::cout << oss.str() << std::endl;
-    }
-}
-
-void OutputQTableToFile(const std::string& filename) {
-    std::ofstream outFile(filename);
-
-    if (!outFile.is_open()) {
-        std::cerr << "Error opening file for writing: " << filename << std::endl;
-        return;
-    }
-
-    for (const auto& pair : QTable) {
-        const std::string& state = pair.first;
-        const std::vector<double>& qValues = pair.second;
-
-        outFile << "State: " << state << std::endl;
-        for (int action = 0; action < numActions; ++action) {
-            outFile << "  Action " << action << ": " << qValues[action] << std::endl;
-        }
-    }
-
-    outFile.close();
-    std::cout << "QTable output to file " << filename << " successfully." << std::endl;
-}
-
-void outputVector2(const Vector2& vectorValues, std::string vectorName, std::ofstream& outFile) {
-	outFile << "  " << vectorName << " x: " << vectorValues.x << std::endl;
-	outFile << "  " << vectorName << " y: " << vectorValues.y << std::endl;
-}
-
-std::string actionToString(Actions action) {
-    switch (action) {
-        case UP: return "UP";
-        case DOWN: return "DOWN";
-        case LEFT: return "LEFT";
-        case RIGHT: return "RIGHT";
-        // Add other cases for other actions
-        default: return "UNKNOWN";
-    }
-}
-
-void outputAllActions(const std::string& filename, std::string& state, const Actions& chosenAction, const Vector2& snakeDirection, const Vector2& snakeHead, const Vector2& foodPosition, const double& reward) {
-	std::ofstream outFile(filename, std::ios::app);
-
-    if (!outFile.is_open()) {
-        std::cerr << "Error opening file for writing: " << filename << std::endl;
-        return;
-    }
-
-	outFile << "Current state: " << state << std::endl;
-	outFile << "  Chosen action: " << actionToString(chosenAction) << std::endl;
-	outFile << "  Reward value: " << reward << std::endl;
-	outputVector2(snakeHead, "Snake head position", outFile);
-	outputVector2(foodPosition, "Food position", outFile);
-	outputVector2(snakeDirection, "Snake direction", outFile);
-
-}
-
-double decayEpsilon(double epsilon, double decayRate) {
-	return epsilon * decayRate;
 }
 
 int main() {
 
-	torch::Tensor tensor = torch::eye(3);
-    std::cout << "Tensor:\n" << tensor << std::endl;
-
-
-	double epsilon = 0.9; // Exploration rate: the probability of choosing a random action instead of best known action.
-	double epsilonDecayRate = 0.999; // The epsilon decay rate.
 	// Initialise game, create game window and set FPS.
 	InitWindow(2 * offset + cellSize * cellCount, 2 * offset + cellSize * cellCount, "Retro Snake");
 	SetTargetFPS(60);
-
+	std::ofstream outFile;
+	outFile.open("output.txt"); 
 	Game game = Game();
+	int done;
+
+	torch::optim::Adam optimizer(policy_net.parameters(), torch::optim::AdamOptions(0.001f)); // Setup optimiser
+
+	loadstatedict(policy_net, target_net);
+	target_net.eval(); // Set to evaluation mode
+	int episode = 0;
 
 	// Game loop:
 	// Check if the esc key pressed to close the window
 	while(WindowShouldClose() == false) {
+		
 		BeginDrawing();
 
 		if (eventTriggered(0.2)) {
-			std::string state = GetState(game.snake, game.food);
-			Actions action = ChooseAction(state, epsilon);
+			episode++;
+			torch::Tensor state = GetState(game.snake, game.food);
+			int action = selectAction(state);
 
-			std::cout << "state: " << state << std::endl;
-			std::cout << "Chosen action: " << action << std::endl;
+			// std::cout << "state: " << state << std::endl;
+			// std::cout << "Chosen action: " << action << std::endl;
 
 			switch (action) {
 				case UP:
@@ -452,23 +452,33 @@ int main() {
 					break;
 			}
 
-			std::cout << "Snake direction: (" << game.snake.direction.x << ", " << game.snake.direction.y << ")" << std::endl;
-
 			game.Update();
 
-			std::string nextState = GetState(game.snake, game.food);
+			torch::Tensor next_state = GetState(game.snake, game.food);
 			double reward = GetReward(game.snake, game.food);
+			
+			if (!game.gameRunning) {
+				done = 0;
+			} else {
+				done = 1;
+			}
+			
+			storeExperience(state, action, reward, next_state, done); // If replay memory smaller than the batch size return, do not train the model.
 
-			UpdateQTable(state, action, reward, nextState);
+			if (episode % 50 == 0) {
+				loadstatedict(policy_net, target_net);
+			}
 
-            outputAllActions("action_history.txt", state, action, game.snake.direction, game.snake.body[0], game.food.position, reward);
+			if (replay_memory.size() > BATCH_SIZE) {
+				torch::Tensor loss = calculateLoss();
+				optimizer.zero_grad(); // Clear gradients of all optimised parameters
+				loss.backward(); // Compute gradients of loss function wrt to parameters, back propagation
+				optimizer.step(); // Update parameters
+			}
 
-			// Apply decay rate
-			std::cout << "Epsilon before" << epsilon << std::endl;
-			epsilon = decayEpsilon(epsilon, epsilonDecayRate);
-			std::cout << "Epsilon after" << epsilon << std::endl;
+		outputProgramState(outFile, episode, action, state, reward, replay_memory.size(), replay_memory);
 
-		}
+		};
 
 		// Player input for moving
 		// if (IsKeyPressed(KEY_UP) && game.snake.direction.y != 1) {
@@ -487,6 +497,8 @@ int main() {
 		// 	game.snake.direction = {1, 0};
 		// 	game.gameRunning = true;
 		// }
+		
+		std::cout << "episode: " << episode << std::endl;
 
 		// Drawing
 		ClearBackground(green);
@@ -496,9 +508,6 @@ int main() {
 		game.Draw();
 		EndDrawing();
 	};
-
-	OutputQTableToFile("qtable_output.txt");
-
 	CloseWindow();
 	return 0;
 }
