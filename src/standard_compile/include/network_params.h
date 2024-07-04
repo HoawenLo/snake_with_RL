@@ -2,7 +2,7 @@
 // Based to DQN class.
 struct networkParams {
     // Determines the memory capacity.
-    int MEMORY_CAPACITY = 5000;
+    int MEMORY_CAPACITY = 10000;
     
     // Determines the selection of action.
     // Determines the balance between exploration and exploitation.
@@ -15,9 +15,11 @@ struct networkParams {
 
     // Neural network parameters.
     double learning_rate = 0.01;
+    double sampling_threshold = 1000; // The point in which you start training once the memory capacity is full enough.
 
     // Q Learning parameters
     double gamma = 0.99;
+    int update_threshold = 10; // number of training iterations of policy network until target network can be updated.
 
     // Reward parameters
     double food_reward = 100.0;

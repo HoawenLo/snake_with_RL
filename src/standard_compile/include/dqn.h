@@ -8,6 +8,7 @@
 #include "../include/game.h"
 #include "../include/neural_network.h"
 #include "../include/network_params.h"
+#include "../include/random_generator.h"
 
 double getReward(const Snake &snake, const Food &food);
 std::vector<float> getState(const Snake &snake, const Food &food);
@@ -22,14 +23,6 @@ public:
         bool done;
     };
 
-    struct storeExperienceParams {
-        const std::vector<double>& state; 
-        int action; 
-        double reward; 
-        const std::vector<double>& next_state; 
-        int done;
-    };
-
     std::vector<Experience> memory;
     size_t capacity;
     size_t position;
@@ -38,9 +31,6 @@ public:
 
     void add(const Experience& experience);
     std::vector<Experience> sample(size_t batch_size);
-    bool isFull() const;
-    void popFront();
-    void storeExperience(const storeExperienceParams& params);
 };
 
 class DQN {

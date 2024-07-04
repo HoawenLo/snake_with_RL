@@ -342,13 +342,12 @@ public:
     size_t capacity;
     size_t position;
 
-    ReplayMemory(size_t capacity) : capacity(capacity), position(0) {}
+    ReplayMemory(size_t capacity) : capacity(capacity), position(0) {
+		memory.resize(capacity);
+	}
 
     void add(const Experience& experience) {
-        if (memory.size() < capacity)
-            memory.push_back(experience);
-        else
-            memory[position] = experience;
+        memory[position] = experience;
         position = (position + 1) % capacity;
     }
 

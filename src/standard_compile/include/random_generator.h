@@ -8,7 +8,6 @@ struct randomGenerator {
     std::mt19937 gen;
     std::uniform_real_distribution<> dis;
 
-
     void initialiseRandomGenerator();
     randomGenerator();
 };
