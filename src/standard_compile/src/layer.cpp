@@ -10,13 +10,13 @@
     Description: Relu activation function for forward propagation.
 
     Arguments:
-        (double) x: Input value.
+        (float) x: Input value.
     
     Returns:
-        (double) Returns input value if positive.
+        (float) Returns input value if positive.
 */ 
-double relu(double x) {
-    return std::max(0.0, x);
+float relu(float x) {
+    return std::max(0.0f, x);
 }
 
 /*
@@ -25,12 +25,12 @@ double relu(double x) {
     Description: Relu derivative activation function for back propagation.
 
     Arguments:
-        (double) x: Input value.
+        (float) x: Input value.
     
     Returns:
-        (double) Returns one if input is positive, else return zero.
+        (float) Returns one if input is positive, else return zero.
 */ 
-double relu_derivative(double x) {
+float relu_derivative(float x) {
     return x > 0 ? 1.0 : 0.0;
 }
 
@@ -56,7 +56,7 @@ double relu_derivative(double x) {
 
         Code:
 
-        weights.resize(output_size, std::vector<double>(input_size));
+        weights.resize(output_size, std::vector<float>(input_size));
 
         Explanation:
 
@@ -87,8 +87,8 @@ double relu_derivative(double x) {
         For each weight and bias, set them to a random value.
 
 */ 
-Layer::Layer(int input_size, int output_size, randomGenerator& rng, double learning_rate) : learning_rate(learning_rate) {
-    weights.resize(output_size, std::vector<double>(input_size));
+Layer::Layer(int input_size, int output_size, randomGenerator& rng, float learning_rate) : learning_rate(learning_rate) {
+    weights.resize(output_size, std::vector<float>(input_size));
     biases.resize(output_size);
 
     for (auto& row : weights) {
@@ -112,11 +112,11 @@ Layer::Layer(int input_size, int output_size, randomGenerator& rng, double learn
     Description: Perform forward propagation for the layer.
 
     Arguments:
-        (std::vector<double>) input: A vector containing the tensor input to be passed
+        (std::vector<float>) input: A vector containing the tensor input to be passed
             through the layer. Tensor is of size input_size.
     
     Returns:
-        (std::vector<double>) Returns a vector of size output_size.
+        (std::vector<float>) Returns a vector of size output_size.
 
     Code Explanation:
 
@@ -157,7 +157,7 @@ Layer::Layer(int input_size, int output_size, randomGenerator& rng, double learn
         Finally for each output value put them through the activation 
         function.
 */ 
-std::vector<double> Layer::forward(const std::vector<double>& input) {
+std::vector<float> Layer::forward(const std::vector<float>& input) {
     inputs = input;
     outputs.resize(biases.size());
     for (size_t i = 0; i < biases.size(); i++) {
@@ -179,11 +179,11 @@ std::vector<double> Layer::forward(const std::vector<double>& input) {
     Description: Perform back propagation for the layer.
 
     Arguments:
-        (std::vector<double>) grad: A vector of size output_size containing the input gradients 
+        (std::vector<float>) grad: A vector of size output_size containing the input gradients 
             for back propagation calculation.
     
     Returns:
-        (std::vector<double>) Returns a vector of size input_size containing the gradients for
+        (std::vector<float>) Returns a vector of size input_size containing the gradients for
             the next layer.
 
     Code Explanation:
@@ -208,7 +208,7 @@ std::vector<double> Layer::forward(const std::vector<double>& input) {
         Code:
 
         for (size_t i = 0; i < outputs.size(); ++i) {
-            double delta = grad[i] * relu_derivative(outputs[i]);
+            float delta = grad[i] * relu_derivative(outputs[i]);
             ...
 
         Explanation:
@@ -254,12 +254,12 @@ std::vector<double> Layer::forward(const std::vector<double>& input) {
 
         dLoss / dBiases = grads_prev_layer
 */ 
-std::vector<double> Layer::backward(const std::vector<double>& grad) {
+std::vector<float> Layer::backward(const std::vector<float>& grad) {
     deltas.resize(inputs.size());
     std::fill(deltas.begin(), deltas.end(), 0.0);
 
     for (size_t i = 0; i < outputs.size(); i++) {
-        double delta = grad[i] * relu_derivative(outputs[i]);
+        float delta = grad[i] * relu_derivative(outputs[i]);
         for (size_t j = 0; j < inputs.size(); j++) {
             deltas[j] += delta * weights[i][j];
         } for (size_t j = 0; j < inputs.size(); j++) {

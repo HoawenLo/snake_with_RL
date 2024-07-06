@@ -10,13 +10,13 @@
 class NeuralNetwork {
 public:
     std::vector<Layer> layers;
-    double learning_rate;
+    float learning_rate;
 
-    NeuralNetwork(double learning_rate);
+    NeuralNetwork(float learning_rate);
 
     void add_layer(int input_size, int output_size);
-    std::vector<double> forward(const std::vector<double>& input);
-    void backward(const std::vector<double>&grad);
+    std::vector<float> forward(const std::vector<float>& input);
+    void backward(const std::vector<float>&grad);
 };
 
 #endif

@@ -15,7 +15,7 @@
     Returns:
         None
 */ 
-NeuralNetwork::NeuralNetwork(double learning_rate) : learning_rate(learning_rate) {};
+NeuralNetwork::NeuralNetwork(float learning_rate) : learning_rate(learning_rate) {};
 
 /*
     Class: NeuralNetwork
@@ -75,8 +75,8 @@ void NeuralNetwork::add_layer(int input_size, int output_size) {
 
         Create a copy of the output vector to pass through the neural network.
 */ 
-std::vector<double> NeuralNetwork::forward(const std::vector<double>& input) {
-    std::vector<double> output = input;
+std::vector<float> NeuralNetwork::forward(const std::vector<float>& input) {
+    std::vector<float> output = input;
     for (auto& layer : layers) {
         output = layer.forward(output);
     } return output;
@@ -110,8 +110,8 @@ std::vector<double> NeuralNetwork::forward(const std::vector<double>& input) {
         Iterate through layers in reverse. Apply back propagation to each layer.
         
 */ 
-void NeuralNetwork::backward(const std::vector<double>& grad) {
-    std::vector<double> delta = grad;
+void NeuralNetwork::backward(const std::vector<float>& grad) {
+    std::vector<float> delta = grad;
     for (auto layer = layers.rbegin(); layer != layers.rend(); ++layer)
         delta = layer->backward(delta);
 }

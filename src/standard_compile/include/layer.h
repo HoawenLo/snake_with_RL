@@ -3,22 +3,22 @@
 
 #include <vector>
 
-double relu(double x);
-double relu_derivative(double x);
+float relu(float x);
+float relu_derivative(float x);
 
 class Layer {
 public:
-    std::vector<std::vector<double>> weights;
-    std::vector<double> biases;
-    std::vector<double> outputs;
-    std::vector<double> inputs;
-    std::vector<double> deltas;
-    double learning_rate;
+    std::vector<std::vector<float>> weights;
+    std::vector<float> biases;
+    std::vector<float> outputs;
+    std::vector<float> inputs;
+    std::vector<float> deltas;
+    float learning_rate;
 
-    Layer(int input_size, int output_size, randomGenerator& rng, double learning_rate);
+    Layer(int input_size, int output_size, randomGenerator& rng, float learning_rate);
 
-    std::vector<double> forward(const std::vector<double>& input);
-    std::vector<double> backward(const std::vector<double>& grad);
+    std::vector<float> forward(const std::vector<float>& input);
+    std::vector<float> backward(const std::vector<float>& grad);
 };
 
 #endif

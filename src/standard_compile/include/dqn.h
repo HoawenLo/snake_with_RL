@@ -10,16 +10,16 @@
 #include "../include/network_params.h"
 #include "../include/random_generator.h"
 
-double getReward(const Snake &snake, const Food &food);
+float getReward(const Snake &snake, const Food &food);
 std::vector<float> getState(const Snake &snake, const Food &food);
 
 class ReplayMemory {
 public:
     struct Experience {
-        std::vector<double> state;
+        std::vector<float> state;
         int action;
-        double reward;
-        std::vector<double> next_state;
+        float reward;
+        std::vector<float> next_state;
         bool done;
     };
 
@@ -44,8 +44,8 @@ public:
 
     void updateTargetNet();
     void train(int batch_size);
-    int argmax(std::vector<double> q_values);
-    int selectAction(const std::vector<double>& state, NeuralNetwork policy_net);
+    int argmax(std::vector<float> q_values);
+    int selectAction(const std::vector<float>& state, NeuralNetwork policy_net);
 };
 
 #endif
