@@ -8,7 +8,6 @@
 #include "../include/game.h"
 #include "../include/neural_network.h"
 #include "../include/network_params.h"
-#include "../include/random_generator.h"
 
 float getReward(const Snake &snake, const Food &food);
 std::vector<float> getState(const Snake &snake, const Food &food);
@@ -29,7 +28,7 @@ public:
 
     ReplayMemory(size_t capacity);
 
-    void add(const Experience& experience);
+    void storeExperience(const Experience& experience);
     std::vector<Experience> sample(size_t batch_size);
 };
 
@@ -38,14 +37,15 @@ public:
     NeuralNetwork policy_net;
     NeuralNetwork target_net;
     ReplayMemory replay_memory;
-    networkParams params;
+    NetworkParams params;
+    int steps_done;
 
-    DQN(int input_size, int output_size, size_t memory_capacity, const networkParams& params);
+    DQN(int input_size, int output_size, size_t memory_capacity, const NetworkParams& params);
 
     void updateTargetNet();
     void train(int batch_size);
     int argmax(std::vector<float> q_values);
-    int selectAction(const std::vector<float>& state, NeuralNetwork policy_net);
+    int selectAction(const std::vector<float>& state, NeuralNetwork policy_net, int episode_number);
 };
 
 #endif

@@ -1,3 +1,5 @@
+#include <iostream>
+#include <algorithm>
 #include <random>
 
 #include "../include/dqn.h"
@@ -24,7 +26,7 @@
     Code:
 
     GameParams game_params; 
-    networkParams training_params;
+    NetworkParams training_params;
 
     float food_reward = training_params.food_reward;
     float self_collision_penalty = training_params.self_collision_penalty;
@@ -75,7 +77,7 @@
 */ 
 float getReward(const Snake &snake, const Food &food) {
     GameParams game_params; 
-    networkParams training_params;
+    NetworkParams training_params;
 
     float food_reward = training_params.food_reward;
     float self_collision_penalty = training_params.self_collision_penalty;
@@ -84,8 +86,14 @@ float getReward(const Snake &snake, const Food &food) {
     float cell_count = game_params.cell_count;
 
     if (Vector2Equals(snake.body[0], food.position)) return food_reward;
-	if (elementInDeque(snake.body[0], snake.body)) return self_collision_penalty;
-	if (snake.body[0].x < 0 || snake.body[0].x >= cell_count || snake.body[0].y < 0 || snake.body[0].y >= cell_count) return edge_collision_penalty;
+	if (elementInDeque(snake.body[0], snake.body)) {
+        std::cout << "self collision penalty" << std::endl;
+        return self_collision_penalty;
+    }
+	if (snake.body[0].x < 0 || snake.body[0].x >= cell_count || snake.body[0].y < 0 || snake.body[0].y >= cell_count) {
+        std::cout << "edge_collision_penalty" << std::endl;
+        return edge_collision_penalty;
+    }
 	return general_time_penalty;
 }
 
@@ -217,25 +225,15 @@ std::vector<float> getState(const Snake &snake, const Food &food) {
 
     Code:
 
-    ReplayMemory::ReplayMemory(size_t capacity) : capacity(capacity), position(0)
+    ReplayMemory::ReplayMemory(size_t capacity) : capacity(capacity), position(0) {}
 
     Explanation:
 
     Assign the capacity attribute to size capacity, then initialise starting position 
     to zero.
-
-    Code:
-
-    memory.resize(capacity);
-
-    Explanation:
-
-    Creates the memory to appropriate size to be filled with experiences.
 */
 
-ReplayMemory::ReplayMemory(size_t capacity) : capacity(capacity), position(0) {
-    memory.resize(capacity);
-}
+ReplayMemory::ReplayMemory(size_t capacity) : capacity(capacity), position(0) {}
 
 /*
     Class: ReplayMemory
@@ -257,8 +255,20 @@ ReplayMemory::ReplayMemory(size_t capacity) : capacity(capacity), position(0) {
     
     Code:
 
-    memory[position] = experience;
-    position = (position + 1) & capacity;
+    if (memory.size() < capacity) {
+        memory.push_back(experience);
+    }
+
+    Explanation:
+
+
+
+    Code:
+
+    else {
+        memory[position] = experience;
+        position = (position + 1) & capacity;
+    }
 
     Explanation:
 
@@ -266,9 +276,14 @@ ReplayMemory::ReplayMemory(size_t capacity) : capacity(capacity), position(0) {
     the remainder operator brings the value back to 0.
 */
 
-void ReplayMemory::add(const Experience& experience) {
-    memory[position] = experience;
-    position = (position + 1) & capacity;
+void ReplayMemory::storeExperience(const Experience& experience) {
+    if (memory.size() < capacity) {
+        memory.push_back(experience);
+    } else {
+        memory[position] = experience;
+        position = (position + 1) % capacity;
+    }
+        
 }
 
 /*
@@ -290,25 +305,25 @@ void ReplayMemory::add(const Experience& experience) {
     Code Explanation:
     
     Code:
-
-    randomGenerator generator;
+    
     std::vector<Experience> batch;
     std::vector<int> seen;
+    std::random_device rd;
+    std::mt19937 gen(rd());
     std::uniform_int_distribution<> dist(0, memory.size() - 1);
 
     Explanation:
 
-    Initialise key variables. Initialise random generator to randomly select experiences.
-    Also initialise batch vector to hold experiences. Initialise seen vector to keep track
-    of the positions of experiences added to batch to ensure that no same experience is 
-    reused. Finally initialise the range to sample the positions values of the experiences
-    in the replay memory vector.
+    Initialise key variables. Initialise batch vector to hold experiences. Initialise seen 
+    vector to keep track of the positions of experiences added to batch to ensure that no 
+    same experience is reused. Finally initialise the range to sample the positions values 
+    of the experiences in the replay memory vector.
 
     Code:
 
     int i = 0;
     while (i < batch_size) {
-        int memory_pos = dist(generator.gen);
+        int memory_pos = dist(gen);
 
     Explanation:
 
@@ -330,14 +345,15 @@ void ReplayMemory::add(const Experience& experience) {
 */
 
 std::vector<ReplayMemory::Experience> ReplayMemory::sample(size_t batch_size) {
-    randomGenerator generator;
     std::vector<Experience> batch;
     std::vector<int> seen;
+    std::random_device rd;
+    std::mt19937 gen(rd());
     std::uniform_int_distribution<> dist(0, memory.size() - 1);
     
     int i = 0;
     while (i < batch_size) {
-        int memory_pos = dist(generator.gen);
+        int memory_pos = dist(gen);
         if (std::find(seen.begin(), seen.end(), memory_pos) == seen.end()) {
             batch.push_back(memory[memory_pos]);
             i++;
@@ -361,7 +377,7 @@ std::vector<ReplayMemory::Experience> ReplayMemory::sample(size_t batch_size) {
             correspond to the snake's possible actions. This should be four.
         (size_t memory_capcacity) An unsigned integer representing the size of the
             memory capacity. This is passed onto the replay memory object.
-        (const networkParams) params: The network parameters from the network_params.h
+        (const NetworkParams) params: The network parameters from the network_params.h
             file. These are hyperparameters.
      
     Returns:
@@ -371,11 +387,11 @@ std::vector<ReplayMemory::Experience> ReplayMemory::sample(size_t batch_size) {
     
     Code:
 
-    DQN::DQN(int input_size, int output_size, size_t memory_capacity, const networkParams& params)
+    DQN::DQN(int input_size, int output_size, size_t memory_capacity, const NetworkParams& params)
     : replay_memory(memory_capacity), 
       params(params),
-      policy_net(params.learning_rate),
-      target_net(params.learning_rate)
+      policy_net(params.LEARNING_RATE),
+      target_net(params.LEARNING_RATE)
     {
         policy_net.add_layer(input_size, 64);
         policy_net.add_layer(128, 64);
@@ -394,11 +410,12 @@ to add
 // require seperate params file for network structure - to implement.
 // error checker if sampling theshold is greater than memory capacity
 */
-DQN::DQN(int input_size, int output_size, size_t memory_capacity, const networkParams& params)
+DQN::DQN(int input_size, int output_size, size_t memory_capacity, const NetworkParams& params)
     : replay_memory(memory_capacity), 
       params(params),
-      policy_net(params.learning_rate),
-      target_net(params.learning_rate)
+      policy_net(params.LEARNING_RATE),
+      target_net(params.LEARNING_RATE),
+      steps_done(params.steps_done)
     {
         policy_net.add_layer(input_size, 64);
         policy_net.add_layer(128, 64);
@@ -552,7 +569,8 @@ void DQN::updateTargetNet() {
     dMSE = Pred - Actual
 */
 void DQN::train(int batch_size) {
-    if (replay_memory.capacity < params.sampling_threshold) {
+
+    if (replay_memory.memory.size() < params.SAMPLING_THRESHOLD) {
         return;
     }
 
@@ -581,6 +599,161 @@ void DQN::train(int batch_size) {
 
         policy_net.backward(grad);
     }
+}
+
+/*
+    Class: DQN
+
+    Component: Method
+    
+    Name: argmax
+
+    Description: Finds the argmax of a vector. That is it returns the position of the element
+        with the largest value.
+
+    Arguments:
+        (std::vector<float>) q_values: The input Q values which represent the Q values of each
+            action of the snake. There are 4 actions, hence 4 Q values.
+     
+    Returns:
+        (int) The position of the maximum element in the vector.
+
+    Code Explanation:
+    
+    Code:
+
+    return std::distance(q_values.begin(), std::max_element(q_values.begin(), q_values.end()));
+
+    Explanation:
+
+    The std::distance function calculates the distance between two elements, in this case the first
+    Q value of the vector, and the maximum Q value. This will return the position of the maximum element.
+*/
+int DQN::argmax(std::vector<float> q_values) {
+    return std::distance(q_values.begin(), std::max_element(q_values.begin(), q_values.end()));
+}
+
+/*
+    Class: DQN
+
+    Component: Method
+    
+    Name: selectAction
+
+    Description: Select the action to perform. 
+
+        If sufficient epsiodes have occurred, allowing sufficient experiences to be collected for
+        the replay memory, non-random (exploitation) actions can be performed.
+
+        Depending on the value of epsilon, there will be a chance that the action which yields the best 
+        reward be executed (exploration) instead of a random action (exploitation).
+
+        Epsilon has a decay value, to enable high exploration at the start, with higher chance of 
+        exploitation at the end.
+
+    Arguments:
+        (const std::vector<float>) state: The input state, that will be passed through the policy network
+            to determine the Q values, thus the best action to perform.
+        (NeuralNetwork) policy_net: The neural network that calculates what action to perform.
+        (int) episode_number: An integer which keeps track of the episode number, which is a count for the
+            number of iterations that the snake has went through. Note this is different to steps_done, which
+            is a count for the decay of epsilon. Episodes is the universal "time" of that the snake has experienced.
+     
+    Returns:
+        (int) An integer representing the action to return.
+
+    Code Explanation:
+    
+    Code:
+
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<> dist_action(0, 3);
+    std::uniform_real_distribution<> dist_epsilon(0, 1.0);
+
+    Explanation:
+
+    Create a generator for selecting values for random actions and one for epsilon. Assuming we are beyond
+    the minimum exploration threshold - that is a threshold which ensures a sufficient amount of the replay
+    memory has been filled. the epsilon determines if a random action will be taken, if it is below the 
+    epsilon threshold.
+
+    Code:
+
+    if (params.MINIMUM_EXPLORATION_THRESHOLD < episode_number) {
+        return dist_action(gen);
+    }
+
+    Explanation:
+
+    If the snake has not reached beyond the minimum exploration threshold, it means it has not yet built sufficient
+    amount of experiences in the replay memory or it has built enough experiences but want to train the neural network
+    a certain amount before allowing exploitation. In such a case return a random action.
+
+    Code:
+
+    float epsilon = params.EPSILON_END + (params.EPSILON_START - params.EPSILON_END) * exp(-1.0 * DQN::steps_done / params.EPSILON_DECAY);
+
+    Explanation:
+
+    Calculate the epsilon threshold. If the generated epsilon value is below this threshold, choose a random action.
+    As the epsilon threshold decays, there will be higher chance for the generated epsilon value to be above this 
+    threshold.
+
+    Code:
+
+    DQN::steps_done++;
+
+    Explanation:
+
+    Increment the number of steps done to progress the decay of epsilon threshold.
+
+    Code:
+
+    if (dist_epsilon(gen) > epsilon) {
+        std::vector<float> q_values = policy_net.forward(state);
+        return DQN::argmax(q_values);
+    }
+
+    Explanation:
+
+    If the generated epsilon value is greater than epsilon threshold, run the state through the policy
+    neural network and calculate an estimation of the best Q values for that state with the current parameters
+    of this neural network. Then take the argmax of these Q values to find the position of the maximum Q
+    value which corresponds to the best action to that - that yields the most cumulative future reward.
+
+    Code:
+
+    else {
+        return dist_action(gen);
+    }
+
+    Explanation:
+
+    Else, the generated epsilon value is less than the epsilon threshold hence select a random
+    action.
+
+*/
+int DQN::selectAction(const std::vector<float>& state, NeuralNetwork policy_net, int episode_number) {
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<> dist_action(0, 3);
+    std::uniform_real_distribution<> dist_epsilon(0, 1.0);
+    
+    if (params.MINIMUM_EXPLORATION_THRESHOLD > episode_number) {
+        return dist_action(gen);
+        
+    }
+
+    float epsilon = params.EPSILON_END + (params.EPSILON_START - params.EPSILON_END) * exp(-1.0 * DQN::steps_done / params.EPSILON_DECAY);
+    DQN::steps_done++;
+    if (dist_epsilon(gen) > epsilon) {
+        std::vector<float> q_values = policy_net.forward(state);
+        return DQN::argmax(q_values);
+    } else {
+        return dist_action(gen);
+    }
+
 }
 
 /*

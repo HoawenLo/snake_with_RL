@@ -5,7 +5,6 @@
 #include <vector>
 
 #include "../include/layer.h"
-#include "../include/random_generator.h"
 
 class NeuralNetwork {
 public:

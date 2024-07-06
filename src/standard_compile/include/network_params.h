@@ -1,25 +1,34 @@
+#ifndef NETWORK_PARAMS_H
+#define NETWORK_PARAMS_H
+
 
 // Based to DQN class.
-struct networkParams {
+struct NetworkParams {
     // Determines the memory capacity.
     int MEMORY_CAPACITY = 10000;
     
     // Determines the selection of action.
     // Determines the balance between exploration and exploitation.
-    const float GAMMA = 0.99;
-    const float EPSILON_START = 1.0;
+    const float EPSILON_START = 1.0; 
     const float EPSILON_END = 0.1;
     const float EPSILON_DECAY = 1000;
-    const int TARGET_UPDATE = 10;
+    
     int steps_done = 0;
+    int MINIMUM_EXPLORATION_THRESHOLD = 100; // The minimum amount of episodes until exploitation can be used. 
+                                              // That is replay memory needs to be full enough. This value needs 
+                                              // to be higher than sampling threshold. The reason there are too 
+                                              // seperate values for this is perhaps you can continue exploration
+                                              // but start training. Hence once you have both enough training and
+                                              // replay memory you can start using
 
     // Neural network parameters.
-    float learning_rate = 0.01;
-    float sampling_threshold = 1000; // The point in which you start training once the memory capacity is full enough.
+    float LEARNING_RATE = 0.01; // Neural network parameter step update.
+    int SAMPLING_THRESHOLD = 100; // The point in which you start training once the memory capacity is full enough.
+    int BATCH_SIZE = 32;
 
     // Q Learning parameters
-    float gamma = 0.99;
-    int update_threshold = 10; // number of training iterations of policy network until target network can be updated.
+    float gamma = 0.99; // Balance between focus on immediate and future rewards.
+    const int TARGET_UPDATE = 50;; // number of training iterations of policy network until target network can be updated.
 
     // Reward parameters
     float food_reward = 100.0;
@@ -28,3 +37,4 @@ struct networkParams {
     float general_time_penalty = 0.1;
 };
 
+#endif

@@ -47,57 +47,6 @@ bool elementInDeque(Vector2 element, std::deque<Vector2> deque) {
 }
 
 /*
-    Function: eventTriggered
-
-    Description: Trigger an event once the time interval is reached. Ensure that game logic
-        it set at a specific pace regardless of frame rate. Allows simulation of calmer framerate.
-
-    Arguments:
-        (float) interval: The interval in which events should be triggered.
-     
-    Returns:
-        (eventResult) Returns true if interval is reached hence event can be triggers, 
-            else return false. Also returns last_update_time to be passed onto next frame.
-
-    Code explanation:
-
-    Code:
-
-    double current_time = GetTime();
-
-    Explanation:
-
-    Raylib method to get current time.
-
-    Code: 
-
-    if (current_time - last_update_time >= interval) {
-        last_update_time = current_time;
-        return {true, last_update_time};
-    } else {
-        return {false, last_update_time};
-    }
-}
-
-    Explanation:
-
-    Check that the current time is an interval. If it is interval, return
-    true else return false. Also return last_update_time so it can be passed
-    onto next frame.
-*/ 
-
-eventResult eventTriggered(float interval, float last_update_time) {
-    double current_time = GetTime();
-
-    if (current_time - last_update_time >= interval) {
-        last_update_time = current_time;
-        return {true, last_update_time};
-    } else {
-        return {false, last_update_time};
-    }
-}
-
-/*
     Class: Snake
 
     Component: Constructor
@@ -109,16 +58,14 @@ eventResult eventTriggered(float interval, float last_update_time) {
         to the body if food is collided with.
 
     Arguments:
-        (std::vector<Vector2>) body: The coordinate positions of the body segments of the snake.
-        (Vector2) direction: A vector which determines the direction the snake is facing, which 
-            determines how to redraw the snake or add new segments.
-        (bool) add_segment: A bool to determine whether to add new segments to the body if food is
-            collided with.
+        (GameParams) params: The game parameters. Holds the parameters for the snake
+            body's initial position, the initial direction it is facing, the add_segment initial
+            value which is false and other parameters such as window properties.
      
     Returns:
         None
 */ 
-Snake::Snake(GameParams params)
+Snake::Snake(const GameParams& params)
     : body(params.body)
     , direction(params.direction)
     , add_segment(params.add_segment)
@@ -246,8 +193,8 @@ void Snake::update() {
 
 */
 void Snake::reset() {
-    body = body;
-    direction = direction;
+    body = params.body;
+    direction = params.direction;
 }
 
 /*
@@ -260,9 +207,8 @@ void Snake::reset() {
     Description: The constructor for the food class sets up the food position.
 
     Arguments:
-        (std::deque<Vector2>) snakeBody: The coordinate points of the components of the snake body.
-        (Vector2) position: The position of the food.
-        (GameParams) params: The parameters of the game such as cell_count or colours.
+        (GameParams) params: The game parameters. Holds the parameters for the snake
+            body's initial position and other parameters such as window properties.
      
     Returns:
         None
@@ -279,7 +225,7 @@ void Snake::reset() {
     body.
 
 */
-Food::Food(std::deque<Vector2> snake_body, GameParams params) 
+Food::Food(std::deque<Vector2> snake_body, const GameParams& params) 
     : position(position)
     , params(params) 
 {
@@ -361,7 +307,7 @@ Vector2 Food::generateRandomPos(std::deque<Vector2> snake_body) {
     Vector2 position = generateRandomCell();
     while(elementInDeque(position, snake_body)) {
         position = generateRandomCell();
-    }
+    } return position;
 }
 
 /*
@@ -404,21 +350,95 @@ void Food::draw() {
     Description: Setup the variables for the game class.
 
     Arguments:
-        (Snake) snake: The snake object.
-        (Food) food: The food object.
-        (bool) game_running: A bool to indicate whether the game is active.
-        (int) score: The score.
+        (GameParams) params: The game parameters. Holds the parameters for the snake
+            body's initial position other parameters such as window properties.
         
     Returns:
         None
+
+    Code Explanation:
+
+    Code:
+
+    Game::Game(bool game_running, int score, const GameParams& params) 
+        : snake(params)
+        , food(snake.body, params)
+        , game_running(game_running)
+        , score(score)
+        , params(params)
+        , last_update_time(last_update_time)
+    {}
+
+    Explanation:
+
+    The constructor takes the arguments and initialises the game_running bool,
+    the score, and game parameters. Creates the snake and food object, passing the
+    parameters to them. 
 */
-Game::Game(bool game_running, int score, const GameParams& params) 
+Game::Game(bool game_running, int score, const GameParams& params, float last_update_time) 
     : snake(params)
     , food(snake.body, params)
     , game_running(game_running)
     , score(score)
     , params(params)
+    , last_update_time(last_update_time)
 {}
+
+
+/*
+    Class: Game
+
+    Component: Method
+
+    Name: eventTriggered
+
+    Description: Trigger an event once the time interval is reached. Ensure that game logic
+        it set at a specific pace regardless of frame rate. Allows simulation of calmer framerate.
+
+    Arguments:
+        (float) interval: The interval in which events should be triggered.
+     
+    Returns:
+        (bool) Returns true if interval is reached hence event can be triggers, 
+            else return false. 
+
+    Code explanation:
+
+    Code:
+
+    double current_time = GetTime();
+
+    Explanation:
+
+    Raylib method to get current time.
+
+    Code: 
+
+    if (current_time - Game::last_update_time >= interval) {
+        Game::last_update_time = current_time;
+        return true;
+    } else {
+        return false;
+    }
+}
+
+    Explanation:
+
+    Check that the current time has reached an interval. If it is interval, return
+    true else return false. The last_update_time value keeps track of the last time
+    an update occurred.
+*/ 
+
+bool Game::eventTriggered(float interval) {
+    double current_time = GetTime();
+
+    if (current_time - Game::last_update_time >= interval) {
+        Game::last_update_time = current_time;
+        return true;
+    } else {
+        return false;
+    }
+}
 
 /*
     Class: Game

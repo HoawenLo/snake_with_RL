@@ -1,8 +1,8 @@
 #include <algorithm>
 #include <iostream>
+#include <random>
 
 #include "../include/layer.h"
-#include "../include/random_generator.h"
 
 /*
     Function: relu
@@ -46,8 +46,8 @@ float relu_derivative(float x) {
     Arguments:
         (int) input_size: The input size of the layer.
         (int) output_size: The output size of the layer.
-        (randomGenerator): The random generator to generate random values for the weights and
-            biases. See src/include/random.h for more details.
+        (float) learning_rate: Learning rate of the neural network.
+
     
     Returns:
         None
@@ -61,6 +61,7 @@ float relu_derivative(float x) {
         Explanation:
 
         
+                
 
         Code:
 
@@ -69,6 +70,16 @@ float relu_derivative(float x) {
         Explanation:
 
         The biases variable is a std::vector. Resize it to the output size.
+
+        Code:
+
+        std::random_device rd;
+        std::mt19937 gen(rd());
+        std::uniform_real_distribution<> dis(-0.1, 0.1);
+
+        Explanation:
+
+        Setup random number generator.
 
         Code:
 
@@ -87,18 +98,22 @@ float relu_derivative(float x) {
         For each weight and bias, set them to a random value.
 
 */ 
-Layer::Layer(int input_size, int output_size, randomGenerator& rng, float learning_rate) : learning_rate(learning_rate) {
+Layer::Layer(int input_size, int output_size, float learning_rate) : learning_rate(learning_rate) {
     weights.resize(output_size, std::vector<float>(input_size));
     biases.resize(output_size);
 
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_real_distribution<> dis(-0.1, 0.1);
+
     for (auto& row : weights) {
         for (auto& val : row) {
-            val = rng.dis(rng.gen);
+            val = dis(gen);
         }
     }
 
     for (auto& val : biases) {
-        val = rng.dis(rng.gen);
+        val = dis(gen);
     }
 }
 
