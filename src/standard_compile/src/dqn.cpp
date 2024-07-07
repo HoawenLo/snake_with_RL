@@ -40,6 +40,15 @@
 
     Code:
 
+    std::deque<Vector2> headless_body = snake.body;
+    headless_body.pop_front();
+
+    Explanation:
+
+    Set up headless body for tail collision penalty.
+
+    Code:
+
     if (Vector2Equals(snake.body[0], food.position)) return food_reward;
 
     Explanation:
@@ -85,15 +94,12 @@ float getReward(const Snake &snake, const Food &food) {
     float general_time_penalty = training_params.general_time_penalty;
     float cell_count = game_params.cell_count;
 
+    std::deque<Vector2> headless_body = snake.body;
+    headless_body.pop_front();
+
     if (Vector2Equals(snake.body[0], food.position)) return food_reward;
-	if (elementInDeque(snake.body[0], snake.body)) {
-        std::cout << "self collision penalty" << std::endl;
-        return self_collision_penalty;
-    }
-	if (snake.body[0].x < 0 || snake.body[0].x >= cell_count || snake.body[0].y < 0 || snake.body[0].y >= cell_count) {
-        std::cout << "edge_collision_penalty" << std::endl;
-        return edge_collision_penalty;
-    }
+	if (elementInDeque(snake.body[0], headless_body)) return self_collision_penalty;
+	if (snake.body[0].x < 0 || snake.body[0].x >= cell_count || snake.body[0].y < 0 || snake.body[0].y >= cell_count) return edge_collision_penalty;
 	return general_time_penalty;
 }
 
