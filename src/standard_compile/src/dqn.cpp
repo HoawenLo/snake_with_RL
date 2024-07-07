@@ -583,9 +583,11 @@ void DQN::train(int batch_size) {
     auto batch = replay_memory.sample(batch_size);
 
     for (const auto& exp : batch) {
-        auto q_values = policy_net.forward(exp.state); // Q_old
 
+        auto q_values = policy_net.forward(exp.state); // Q_old
+        std::cout << "Performed forward with policy net" << std::endl;
         auto next_q_values = target_net.forward(exp.next_state); // Q_target
+        std::cout << "Performed forward with target net" << std::endl;
         float q_update = exp.reward; // r_current
 
         if (!exp.done) {

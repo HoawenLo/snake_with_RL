@@ -156,7 +156,7 @@ Layer::Layer(int input_size, int output_size, float learning_rate) : learning_ra
 
         for (size_t i = 0; i < biases.size(); i++) {
             outputs[i] = biases[i];
-            for (size_t j = 0; j < input.size(); i++) {
+            for (size_t j = 0; j < input.size(); j++) {
                 outputs[i] += weights[i][j] * input[j];
             } outputs[i] = relu(outputs[i]);
         }
@@ -173,11 +173,17 @@ Layer::Layer(int input_size, int output_size, float learning_rate) : learning_ra
         function.
 */ 
 std::vector<float> Layer::forward(const std::vector<float>& input) {
+
+    std::cout << "input is: " << std::endl;
+    for (auto& val : input) {
+        std::cout << val << std::endl;
+    }
+
     inputs = input;
     outputs.resize(biases.size());
     for (size_t i = 0; i < biases.size(); i++) {
         outputs[i] = biases[i];
-        for (size_t j = 0; j < input.size(); i++) {
+        for (size_t j = 0; j < input.size(); j++) {
             outputs[i] += weights[i][j] * input[j];
         } outputs[i] = relu(outputs[i]);
     }
