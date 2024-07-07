@@ -97,9 +97,15 @@ float getReward(const Snake &snake, const Food &food) {
     std::deque<Vector2> headless_body = snake.body;
     headless_body.pop_front();
 
-    if (Vector2Equals(snake.body[0], food.position)) return food_reward;
-	if (elementInDeque(snake.body[0], headless_body)) return self_collision_penalty;
-	if (snake.body[0].x < 0 || snake.body[0].x >= cell_count || snake.body[0].y < 0 || snake.body[0].y >= cell_count) return edge_collision_penalty;
+    if (Vector2Equals(snake.body[0], food.position)) {
+        return food_reward;
+    }
+	if (elementInDeque(snake.body[0], headless_body)) {
+        return self_collision_penalty;
+    } 
+	if (snake.body[0].x < 0 || snake.body[0].x >= cell_count || snake.body[0].y < 0 || snake.body[0].y >= cell_count) {
+        return edge_collision_penalty;
+    }
 	return general_time_penalty;
 }
 
@@ -423,9 +429,9 @@ DQN::DQN(int input_size, int output_size, size_t memory_capacity, const NetworkP
       target_net(params.LEARNING_RATE),
       steps_done(params.steps_done)
     {
-        policy_net.add_layer(input_size, 64);
-        policy_net.add_layer(128, 64);
-        policy_net.add_layer(64, output_size);
+        policy_net.add_layer(input_size, 32);
+        policy_net.add_layer(64, 32);
+        policy_net.add_layer(32, output_size);
         target_net = policy_net;
     }
 
@@ -585,9 +591,7 @@ void DQN::train(int batch_size) {
     for (const auto& exp : batch) {
 
         auto q_values = policy_net.forward(exp.state); // Q_old
-        std::cout << "Performed forward with policy net" << std::endl;
         auto next_q_values = target_net.forward(exp.next_state); // Q_target
-        std::cout << "Performed forward with target net" << std::endl;
         float q_update = exp.reward; // r_current
 
         if (!exp.done) {
@@ -749,16 +753,20 @@ int DQN::selectAction(const std::vector<float>& state, NeuralNetwork policy_net,
     std::uniform_real_distribution<> dist_epsilon(0, 1.0);
     
     if (params.MINIMUM_EXPLORATION_THRESHOLD > episode_number) {
+        std::cout << "Random action selected" << std::endl;
         return dist_action(gen);
-        
     }
 
     float epsilon = params.EPSILON_END + (params.EPSILON_START - params.EPSILON_END) * exp(-1.0 * DQN::steps_done / params.EPSILON_DECAY);
+    std::cout << "epsilon: " << epsilon << std::endl;
+
     DQN::steps_done++;
     if (dist_epsilon(gen) > epsilon) {
+        std::cout << "Best action selected" << std::endl;
         std::vector<float> q_values = policy_net.forward(state);
         return DQN::argmax(q_values);
     } else {
+        std::cout << "Random action selected" << std::endl;
         return dist_action(gen);
     }
 

@@ -54,7 +54,7 @@ public:
 
     bool eventTriggered(float interval);
     void draw();
-    void update();
+    void checkCollisions();
     void checkCollisionWithFood();
     void checkCollisionWithEdges();
     void checkCollisionWithTail();

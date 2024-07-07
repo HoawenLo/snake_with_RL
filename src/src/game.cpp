@@ -465,9 +465,9 @@ void Game::draw() {
 
     Component: Method
 
-    Name: update
+    Name: checkCollisions
 
-    Description: Update positions of snake and check collisions with food, edges or tail.
+    Description: Check collisions with food, edges or tail.
 
     Arguments:
         None
@@ -475,9 +475,8 @@ void Game::draw() {
     Returns:
         None
 */
-void Game::update() {
+void Game::checkCollisions() {
     if(game_running) {
-        snake.update();
         checkCollisionWithFood();
         checkCollisionWithEdges();
         checkCollisionWithTail();

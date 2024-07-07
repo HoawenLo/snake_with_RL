@@ -38,6 +38,9 @@ int main() {
 
 		// Set the game updates to specific interval.
 		if (game.eventTriggered(0.2)) {
+			
+			// Update snake position
+			game.snake.update();
 
 			// Increment episode
 			episode++;
@@ -75,9 +78,6 @@ int main() {
 					break;
 			}
 
-			// Once action has been taken update the graphics of the game.
-			game.update();
-
 			// Get the reward from action being done.
 			float reward = getReward(game.snake, game.food);
 
@@ -106,6 +106,9 @@ int main() {
 
 			std::cout << "episode: " << episode << std::endl;
 			std::cout << "action: " << action << " ::: reward:" << reward << std::endl;
+			
+			// Check collisions
+			game.checkCollisions();
 		}
 
 		// if (IsKeyPressed(KEY_UP) && game.snake.direction.y != 1) {
@@ -124,9 +127,6 @@ int main() {
 		// 	game.snake.direction = {1, 0};
 		// 	game.game_running = true;
 		// }
-
-		// Output the current episode number
-		
 
 		// Drawing the background graphics
 		ClearBackground(game_params.green);

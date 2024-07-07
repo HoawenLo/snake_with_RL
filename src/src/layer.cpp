@@ -174,11 +174,6 @@ Layer::Layer(int input_size, int output_size, float learning_rate) : learning_ra
 */ 
 std::vector<float> Layer::forward(const std::vector<float>& input) {
 
-    std::cout << "input is: " << std::endl;
-    for (auto& val : input) {
-        std::cout << val << std::endl;
-    }
-
     inputs = input;
     outputs.resize(biases.size());
     for (size_t i = 0; i < biases.size(); i++) {
