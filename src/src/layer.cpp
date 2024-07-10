@@ -104,16 +104,16 @@ Layer::Layer(int input_size, int output_size, float learning_rate) : learning_ra
 
     std::random_device rd;
     std::mt19937 gen(rd());
-    std::uniform_real_distribution<> dis(-0.1, 0.1);
+    std::uniform_real_distribution<> dis(0.0, 0.1);
 
     for (auto& row : weights) {
         for (auto& val : row) {
             val = dis(gen);
         }
     }
-
+    // initialise biases to avoid dead neurons > trying to figure out cause of q values convergine to zero
     for (auto& val : biases) {
-        val = dis(gen);
+        val = 0.01;
     }
 }
 
@@ -285,4 +285,7 @@ std::vector<float> Layer::backward(const std::vector<float>& grad) {
 }
 
 
+void save_weights() {
+    
+}
 

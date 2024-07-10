@@ -84,7 +84,7 @@
     possible.
 
 */ 
-float getReward(const Snake &snake, const Food &food) {
+float getReward(const Snake &snake, const Food &food, const Vector2 &previous_head_position) {
     GameParams game_params; 
     NetworkParams training_params;
 
@@ -92,7 +92,17 @@ float getReward(const Snake &snake, const Food &food) {
     float self_collision_penalty = training_params.self_collision_penalty;
     float edge_collision_penalty = training_params.edge_collision_penalty;
     float general_time_penalty = training_params.general_time_penalty;
+    float move_towards_food_reward = training_params.move_towards_food_reward;
     float cell_count = game_params.cell_count;
+
+    // Calculate distances
+    float previous_distance = sqrt(pow(previous_head_position.x - food.position.x, 2) + 
+                                   pow(previous_head_position.y - food.position.y, 2));
+    float current_distance = sqrt(pow(snake.body[0].x - food.position.x, 2) + 
+                                  pow(snake.body[0].y - food.position.y, 2));
+
+    // Calculate distance change
+    float distance_change = previous_distance - current_distance;
 
     std::deque<Vector2> headless_body = snake.body;
     headless_body.pop_front();
@@ -106,7 +116,9 @@ float getReward(const Snake &snake, const Food &food) {
 	if (snake.body[0].x < 0 || snake.body[0].x >= cell_count || snake.body[0].y < 0 || snake.body[0].y >= cell_count) {
         return edge_collision_penalty;
     }
-	return general_time_penalty;
+
+    // Return the reward based on distance change
+    return distance_change * move_towards_food_reward;
 }
 
 /*
@@ -187,32 +199,45 @@ float getReward(const Snake &snake, const Food &food) {
 std::vector<float> getState(const Snake &snake, const Food &food) {
 	Vector2 head = snake.body[0];
 	Vector2 foodPos = food.position;
-	Vector2 direction = snake.direction;
     GameParams params;
 
 	bool obstacleUp = false, obstacleDown = false, obstacleLeft = false, obstacleRight = false;
 
-	if (elementInDeque(Vector2{head.x, head.y - 1}, snake.body) || head.y - 1 < 0) obstacleUp = true;
-	if (elementInDeque(Vector2{head.x, head.y + 1}, snake.body) || head.y + 1 >= params.cell_count) obstacleDown = false;
-	if (elementInDeque(Vector2{head.x - 1, head.y}, snake.body) || head.x - 1 < 0) obstacleLeft = true;
-	if (elementInDeque(Vector2{head.x + 1, head.y}, snake.body) || head.x + 1 >= params.cell_count) obstacleRight = true;
+    float direction = 0;
+    if (snake.direction.x == 1) direction = 1;
+    else if (snake.direction.y == 1) direction = 2;
+    else if (snake.direction.x == -1) direction = 3;
 
 	float normalisedHeadX = head.x / (float)params.cell_count;
 	float normalisedHeadY = head.y / (float)params.cell_count;
-	float normalisedFoodX = foodPos.x / (float)params.cell_count;
-	float normalisedFoodY = foodPos.y / (float)params.cell_count;
+    float relativeFoodX = (foodPos.x - head.x) / (float)params.cell_count;
+    float relativeFoodY = (foodPos.y - head.y) / (float)params.cell_count;
+
+     // Calculate distances to obstacles
+    auto distanceToObstacle = [&](int dx, int dy) {
+        float distance = 0;
+        float x = head.x + dx, y = head.y + dy;
+        while (x >= 0 && x < params.cell_count && y >= 0 && y < params.cell_count && !elementInDeque(Vector2{x, y}, snake.body)) {
+            distance++;
+            x += dx;
+            y += dy;
+        }
+        return distance / (float)params.cell_count;
+    };
+
+    float normalisedLength = (snake.body.size() - 1) / (float)(params.cell_count * params.cell_count - 1);
 
 	std::vector<float> state = std::vector({
 		normalisedHeadX,
         normalisedHeadY,
-        normalisedFoodX,
-        normalisedFoodY,
-        direction.x,
-        direction.y,
-        (float)obstacleUp,
-        (float)obstacleDown,
-        (float)obstacleLeft,
-        (float)obstacleRight
+        relativeFoodX,
+        relativeFoodY,
+        direction / 3.0f,
+        normalisedLength,
+        distanceToObstacle(0, -1),  
+        distanceToObstacle(0, 1),   
+        distanceToObstacle(-1, 0),  
+        distanceToObstacle(1, 0)
 	});
 
 	return state;
@@ -429,9 +454,9 @@ DQN::DQN(int input_size, int output_size, size_t memory_capacity, const NetworkP
       target_net(params.LEARNING_RATE),
       steps_done(params.steps_done)
     {
-        policy_net.add_layer(input_size, 32);
-        policy_net.add_layer(64, 32);
-        policy_net.add_layer(32, output_size);
+        policy_net.add_layer(input_size, 128);
+        policy_net.add_layer(128, 128);
+        policy_net.add_layer(128, output_size);
         target_net = policy_net;
     }
 

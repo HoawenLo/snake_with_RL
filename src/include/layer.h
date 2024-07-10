@@ -19,6 +19,9 @@ public:
 
     std::vector<float> forward(const std::vector<float>& input);
     std::vector<float> backward(const std::vector<float>& grad);
+
+    void save_weights();
+    void load_weights();
 };
 
 #endif

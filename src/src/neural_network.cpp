@@ -115,3 +115,5 @@ void NeuralNetwork::backward(const std::vector<float>& grad) {
     for (auto layer = layers.rbegin(); layer != layers.rend(); ++layer)
         delta = layer->backward(delta);
 }
+
+

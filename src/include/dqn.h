@@ -9,7 +9,7 @@
 #include "../include/neural_network.h"
 #include "../include/network_params.h"
 
-float getReward(const Snake &snake, const Food &food);
+float getReward(const Snake &snake, const Food &food, const Vector2 &previous_head_position);
 std::vector<float> getState(const Snake &snake, const Food &food);
 
 class ReplayMemory {

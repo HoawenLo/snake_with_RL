@@ -67,9 +67,9 @@ bool elementInDeque(Vector2 element, std::deque<Vector2> deque) {
 */ 
 Snake::Snake(const GameParams& params)
     : body(params.body)
-    , direction(params.direction)
     , add_segment(params.add_segment)
     , params(params)
+    , direction(params.direction)
 {}
 
 /*
@@ -476,11 +476,9 @@ void Game::draw() {
         None
 */
 void Game::checkCollisions() {
-    if(game_running) {
-        checkCollisionWithFood();
-        checkCollisionWithEdges();
-        checkCollisionWithTail();
-    }
+    checkCollisionWithFood();
+    checkCollisionWithEdges();
+    checkCollisionWithTail();
 }
 
 /*
@@ -572,10 +570,10 @@ void Game::checkCollisionWithFood() {
     it is, run the game over function.
 */
 void Game::checkCollisionWithEdges() {
-    if (snake.body[0].x == params.cell_count || snake.body[0].x == -1) {
+    if (snake.body[0].x >= params.cell_count || snake.body[0].x <= -1) {
         gameOver();
     }
-    if (snake.body[0].y == params.cell_count || snake.body[0].y == -1) {
+    if (snake.body[0].y >= params.cell_count || snake.body[0].y <= -1) {
         gameOver();
     }
 }
