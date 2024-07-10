@@ -1,1 +1,1 @@
-g++ src/*.cpp -o testtwo -Iinclude/ -lraylib -Iexternal_libraries/include/ -Lexternal_libraries/bin/ -lraylib -lopengl32 -lgdi32 -lwinmm
+g++ src/*.cpp -o test_load_in_weights -Iinclude/ -lraylib -Iexternal_libraries/include/ -Lexternal_libraries/bin/ -lraylib -lopengl32 -lgdi32 -lwinmm

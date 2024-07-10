@@ -771,7 +771,7 @@ int DQN::argmax(std::vector<float> q_values) {
     action.
 
 */
-int DQN::selectAction(const std::vector<float>& state, NeuralNetwork policy_net, int episode_number) {
+int DQN::selectActionTrain(const std::vector<float>& state, NeuralNetwork policy_net, int episode_number) {
     std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_int_distribution<> dist_action(0, 3);
@@ -818,3 +818,8 @@ int DQN::selectAction(const std::vector<float>& state, NeuralNetwork policy_net,
     Returns:
         None
 */
+
+int DQN::selectActionTest(const std::vector<float>& state, NeuralNetwork policy_net) {
+    std::vector<float> q_values = policy_net.forward(state);
+    return DQN::argmax(q_values);
+}

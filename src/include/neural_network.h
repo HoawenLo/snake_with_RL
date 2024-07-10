@@ -33,8 +33,7 @@ public:
     void add_layer(int input_size, int output_size);
     std::vector<float> forward(const std::vector<float>& input);
     void backward(const std::vector<float>&grad);
-    void read_in_weight_biases();
-    void load_weights_biases(std::vector<float> weights_biases);
+    void load_in_network_params(std::vector<std::vector<std::vector<float>>>& loaded_weights, std::vector<std::vector<float>>& loaded_biases);
     
 };
 

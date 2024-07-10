@@ -1,3 +1,5 @@
 src/build/
 src/lib/
+
+/src/results/
 test/

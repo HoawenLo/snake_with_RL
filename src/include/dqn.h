@@ -45,7 +45,8 @@ public:
     void updateTargetNet();
     void train(int batch_size);
     int argmax(std::vector<float> q_values);
-    int selectAction(const std::vector<float>& state, NeuralNetwork policy_net, int episode_number);
+    int selectActionTrain(const std::vector<float>& state, NeuralNetwork policy_net, int episode_number);
+    int selectActionTest(const std::vector<float>& state, NeuralNetwork policy_net);
 };
 
 #endif

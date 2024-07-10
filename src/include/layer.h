@@ -20,8 +20,7 @@ public:
     std::vector<float> forward(const std::vector<float>& input);
     std::vector<float> backward(const std::vector<float>& grad);
 
-    void save_weights();
-    void load_weights();
+    void load_in_params(std::vector<std::vector<float>>& loaded_weights, std::vector<float>& loaded_biases);
 };
 
 #endif

@@ -19,7 +19,7 @@ struct GameParams {
     int offset = 75;
 
     // Frame rate parameters
-    float frame_rate = 1000;
+    float frame_rate = 10;
 
     // Total window size includes two border regions (the offset) and game region (cell_size / cell_count).
     int game_window_height = 2 * offset + cell_size * cell_count;

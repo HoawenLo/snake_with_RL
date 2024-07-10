@@ -284,8 +284,17 @@ std::vector<float> Layer::backward(const std::vector<float>& grad) {
     } return deltas;
 }
 
+void Layer::load_in_params(std::vector<std::vector<float>>& loaded_weights, std::vector<float>& loaded_biases) {
 
-void save_weights() {
-    
+    if (loaded_weights.size() != weights.size() || loaded_biases.size() != biases.size()) {
+        std::cout << loaded_weights.size() << std::endl;
+        std::cout << weights.size() << std::endl;
+        std::cout << loaded_biases.size() << std::endl;
+        std::cout << biases.size() << std::endl;
+        throw std::runtime_error("Mismatch in layer dimensions and loaded parameters");
+    }
+
+    weights = loaded_weights;
+    biases = loaded_biases;
 }
 

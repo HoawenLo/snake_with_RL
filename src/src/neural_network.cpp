@@ -116,4 +116,19 @@ void NeuralNetwork::backward(const std::vector<float>& grad) {
         delta = layer->backward(delta);
 }
 
+void NeuralNetwork::load_in_network_params(std::vector<std::vector<std::vector<float>>>& loaded_weights, std::vector<std::vector<float>>& loaded_biases) {
+
+
+    if (loaded_weights.size() != layers.size() || loaded_biases.size() != layers.size()) {
+        std::cout << loaded_weights.size() << std::endl;
+        std::cout << loaded_biases.size() << std::endl;
+        std::cout << layers.size() << std::endl;
+        throw std::runtime_error("Mismatch in number of layers and loaded parameters");
+    }
+
+    for (int i = 0; i < layers.size(); i++) {
+        layers[i].load_in_params(loaded_weights[i], loaded_biases[i]);
+    }
+}
+
 
