@@ -1,6 +1,7 @@
 #ifndef NETWORK_PARAMS_H
 #define NETWORK_PARAMS_H
 
+#include <string>
 
 // Based to DQN class.
 struct NetworkParams {
@@ -36,6 +37,12 @@ struct NetworkParams {
     float self_collision_penalty = -20.0;
     float edge_collision_penalty = -20.0;
     float general_time_penalty = -0.1;
+
+    // Train/Test parameters
+    bool human_guidance_mode = false; // Determines whether to use human to gather data.
+    bool train_mode = true;
+    std::string weights_filepath = "best_weights_two.txt";
+    std::string biases_filepath = "best_biases_two.txt";
 };
 
 #endif
